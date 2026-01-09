@@ -1,4 +1,4 @@
-# 🎮 Horizon Engine
+# Horizon Engine
 
 [![C++20](https://img.shields.io/badge/C++-20-blue.svg)](https://isocpp.org/)
 [![OpenGL](https://img.shields.io/badge/OpenGL-4.1-green.svg)](https://www.opengl.org/)
@@ -7,9 +7,7 @@
 
 A modern **C++20 game engine** built for FPS games, featuring an Entity-Component-System architecture, OpenGL 4.1 renderer, and action-based input system.
 
-![Engine Demo](docs/demo.gif)
-
-## ✨ Features
+## Features
 
 - **Entity-Component-System (ECS)** - Data-oriented architecture for high performance
 - **OpenGL 4.1 Renderer** - Cross-platform graphics (macOS, Windows, Linux)
@@ -18,7 +16,7 @@ A modern **C++20 game engine** built for FPS games, featuring an Entity-Componen
 - **Memory Arena Allocator** - Efficient memory management with `std::pmr`
 - **FPS Camera** - Smooth mouse look with configurable sensitivity
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Prerequisites
 
@@ -52,7 +50,7 @@ cmake --build build --parallel
 | `Ctrl`    | Crouch/Down |
 | `Esc`     | Quit        |
 
-## 🏗️ Architecture
+## Architecture
 
 ```
 horizon-engine/
@@ -66,7 +64,7 @@ horizon-engine/
 └── third_party/      # External dependencies
 ```
 
-## 🔧 Dependencies
+## Dependencies
 
 All dependencies are fetched automatically via CMake FetchContent:
 
@@ -78,7 +76,7 @@ All dependencies are fetched automatically via CMake FetchContent:
 | [Catch2](https://github.com/catchorg/Catch2) | 3.5.2   | Testing           |
 | [GLAD](https://glad.dav1d.de/)               | -       | OpenGL Loader     |
 
-## 🧪 Testing
+## Testing
 
 ```bash
 cd build && ctest --output-on-failure
@@ -88,7 +86,7 @@ cd build && ctest --output-on-failure
 100% tests passed, 0 tests failed out of 7
 ```
 
-## 📋 Roadmap
+## Roadmap
 
 - [x] **Milestone 0**: Repository & Build System
 - [x] **Milestone 1**: Core Systems (ECS, Input, Game Loop)
@@ -97,10 +95,6 @@ cd build && ctest --output-on-failure
 - [ ] **Milestone 4**: Physics (Jolt Integration)
 - [ ] **Milestone 5**: Audio, AI, UI (Dear ImGui)
 
-## 📄 License
+## License
 
 MIT License - see [LICENSE](LICENSE) for details.
-
----
-
-Built with ❤️ using C++20
