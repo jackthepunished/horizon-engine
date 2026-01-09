@@ -1,138 +1,106 @@
-# Horizon Engine
+# 🎮 Horizon Engine
 
-A modern **C++20 3D FPS game engine** with Vulkan rendering, designed for performance, safety, determinism, and testability.
+[![C++20](https://img.shields.io/badge/C++-20-blue.svg)](https://isocpp.org/)
+[![OpenGL](https://img.shields.io/badge/OpenGL-4.1-green.svg)](https://www.opengl.org/)
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Tests](https://img.shields.io/badge/Tests-7%20passing-brightgreen.svg)](#testing)
 
-[![C++20](https://img.shields.io/badge/C%2B%2B-20-blue.svg)](https://en.cppreference.com/w/cpp/20)
-[![Vulkan](https://img.shields.io/badge/Vulkan-1.3-red.svg)](https://www.vulkan.org/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+A modern **C++20 game engine** built for FPS games, featuring an Entity-Component-System architecture, OpenGL 4.1 renderer, and action-based input system.
 
-## Features
+![Engine Demo](docs/demo.gif)
 
-- **Pure ECS Architecture** - Entities as IDs, components as data, systems as logic
-- **RAII Vulkan Wrappers** - No raw `vkDestroy*` calls, automatic cleanup
-- **Fixed Timestep Simulation** - Deterministic updates for replays and networking
-- **PMR Memory Model** - Custom allocators with frame arenas and pools
-- **Action-Based Input** - Configurable bindings for FPS controls
-- **Headless Testing** - Run tests without GPU or window
+## ✨ Features
 
-## Building
+- **Entity-Component-System (ECS)** - Data-oriented architecture for high performance
+- **OpenGL 4.1 Renderer** - Cross-platform graphics (macOS, Windows, Linux)
+- **Action-Based Input** - Abstract input mapping for keyboard, mouse, and gamepad
+- **Fixed-Timestep Game Loop** - Deterministic physics at 60 Hz
+- **Memory Arena Allocator** - Efficient memory management with `std::pmr`
+- **FPS Camera** - Smooth mouse look with configurable sensitivity
+
+## 🚀 Quick Start
 
 ### Prerequisites
 
-- **CMake 3.21+**
-- **C++20 compatible compiler** (Clang 14+, GCC 12+, MSVC 2022+)
-- **Vulkan SDK 1.3+**
+- CMake 3.21+
+- C++20 compiler (Clang 14+, GCC 11+, MSVC 2022+)
+- Git
 
-### Build Commands
+### Build
 
 ```bash
-# Clone and build
-git clone https://github.com/yourusername/horizon-engine.git
+# Clone
+git clone https://github.com/jackthepunished/horizon-engine.git
 cd horizon-engine
 
-# Configure
-cmake -B build -DCMAKE_BUILD_TYPE=Debug
-
-# Build
+# Configure & Build
+cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --parallel
 
-# Run sample game
+# Run
 ./build/bin/horizon_game
-
-# Run tests
-cd build && ctest --output-on-failure
 ```
 
-### Build Options
+### Controls
 
-| Option                 | Default | Description                      |
-| ---------------------- | ------- | -------------------------------- |
-| `HZ_BUILD_TESTS`       | ON      | Build unit tests                 |
-| `HZ_BUILD_GAME`        | ON      | Build sample game                |
-| `HZ_ENABLE_VALIDATION` | ON      | Enable Vulkan validation layers  |
-| `HZ_HEADLESS`          | OFF     | Build without GPU/window support |
+| Key       | Action      |
+| --------- | ----------- |
+| `W/A/S/D` | Move        |
+| `Mouse`   | Look around |
+| `Shift`   | Sprint      |
+| `Space`   | Jump/Up     |
+| `Ctrl`    | Crouch/Down |
+| `Esc`     | Quit        |
 
-## Project Structure
+## 🏗️ Architecture
 
 ```
 horizon-engine/
-├── engine/                 # Core engine library
-│   ├── core/              # Types, logging, memory, game loop
-│   ├── ecs/               # Entity-component-system
-│   ├── platform/          # Window, input abstraction
-│   └── renderer/          # Vulkan backend
-├── game/                   # Sample FPS sandbox
-├── tests/                  # Unit tests (Catch2)
-├── tools/                  # Asset pipeline, CLI tools
-├── third_party/           # Dependencies (FetchContent)
-└── docs/                   # Architecture documentation
+├── engine/           # Core engine library
+│   ├── core/         # Logging, memory, game loop
+│   ├── ecs/          # Entity-Component-System
+│   ├── platform/     # Window, input abstraction
+│   └── renderer/     # OpenGL renderer, shaders
+├── game/             # Sample FPS game
+├── tests/            # Unit tests (Catch2)
+└── third_party/      # External dependencies
 ```
 
-## Architecture Highlights
+## 🔧 Dependencies
 
-### RAII Vulkan
+All dependencies are fetched automatically via CMake FetchContent:
 
-Every Vulkan object is wrapped in a move-only RAII type:
+| Library                                      | Version | Purpose           |
+| -------------------------------------------- | ------- | ----------------- |
+| [GLFW](https://www.glfw.org/)                | 3.4     | Windowing & Input |
+| [GLM](https://github.com/g-truc/glm)         | 1.0.1   | Math Library      |
+| [spdlog](https://github.com/gabime/spdlog)   | 1.14.1  | Logging           |
+| [Catch2](https://github.com/catchorg/Catch2) | 3.5.2   | Testing           |
+| [GLAD](https://glad.dav1d.de/)               | -       | OpenGL Loader     |
 
-```cpp
-// Automatic cleanup on destruction
-vk::Instance instance{config};
-vk::Device device{instance, surface};
-vk::Swapchain swapchain{device, surface, width, height};
+## 🧪 Testing
+
+```bash
+cd build && ctest --output-on-failure
 ```
 
-### Pure ECS
-
-```cpp
-// Entities are just IDs
-Entity player = world.create_entity();
-
-// Components are plain data
-world.add_component<Transform>(player, {0, 0, 0});
-world.add_component<Health>(player, 100, 100);
-
-// Systems contain all logic
-class DamageSystem : public ISystem {
-    void update(World& world, f64 dt) override { ... }
-};
+```
+100% tests passed, 0 tests failed out of 7
 ```
 
-### Fixed Timestep
+## 📋 Roadmap
 
-```cpp
-GameLoop loop;
-loop.set_update_callback([](f64 dt) {
-    // dt is always fixed (e.g., 1/60s)
-    world.update(dt);
-});
-loop.set_render_callback([](f64 alpha) {
-    // alpha for interpolation
-    renderer.render(alpha);
-});
-loop.run();
-```
+- [x] **Milestone 0**: Repository & Build System
+- [x] **Milestone 1**: Core Systems (ECS, Input, Game Loop)
+- [x] **Milestone 2**: OpenGL Rendering (Shaders, Meshes, Camera)
+- [ ] **Milestone 3**: Assets & Hot Reload
+- [ ] **Milestone 4**: Physics (Jolt Integration)
+- [ ] **Milestone 5**: Audio, AI, UI (Dear ImGui)
 
-## Roadmap
-
-- [x] **Milestone 0**: Repository scaffold + CMake
-- [x] **Milestone 1**: Core systems (ECS, input, game loop)
-- [x] **Milestone 2**: Vulkan renderer (clear screen)
-- [ ] **Milestone 3**: Assets + hot reload
-- [ ] **Milestone 4**: FPS controller + physics
-- [ ] **Milestone 5**: Audio, AI, UI stubs
-- [ ] **Milestone 6**: Networking architecture
-- [ ] **Milestone 7**: Tools + packaging
-
-## Dependencies
-
-| Library                                      | Version | Purpose   |
-| -------------------------------------------- | ------- | --------- |
-| [GLFW](https://www.glfw.org/)                | 3.4     | Windowing |
-| [GLM](https://github.com/g-truc/glm)         | 1.0.1   | Math      |
-| [spdlog](https://github.com/gabime/spdlog)   | 1.14.1  | Logging   |
-| [Vulkan](https://www.vulkan.org/)            | 1.3+    | Graphics  |
-| [Catch2](https://github.com/catchorg/Catch2) | 3.5.2   | Testing   |
-
-## License
+## 📄 License
 
 MIT License - see [LICENSE](LICENSE) for details.
+
+---
+
+Built with ❤️ using C++20
