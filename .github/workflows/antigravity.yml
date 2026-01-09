@@ -1,0 +1,42 @@
+name: Antigravity Framework Integrity
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - ".agent/**"
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - ".agent/**"
+
+jobs:
+  validate-rules:
+    name: Verify Agent Rules
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install YAML Validator
+        run: sudo apt-get install -y yamllint
+
+      - name: Validate YAML Syntax
+        run: |
+          yamllint -d "{extends: default, rules: {line-length: disable}}" .agent/rules/
+          yamllint -d "{extends: default, rules: {line-length: disable}}" .agent/workflows/
+
+      - name: Check for Forbidden Patterns
+        run: |
+          # Fails if "TODO" or "FIXME" is found in the agent definitions
+          if grep -rE "TODO|FIXME" .agent/; then
+            echo "::error::Agent definitions contain forbidden placeholders (TODO/FIXME)."
+            exit 1
+          fi
+
+      - name: Verify Strict Mode
+        run: |
+          # Ensure every rule file explicitly disables "speculation"
+          if ! grep -q "no_speculation" .agent/rules/global.rules.yaml; then
+            echo "::error::global.rules.yaml must explicitly forbid speculation."
+            exit 1
+          fi
