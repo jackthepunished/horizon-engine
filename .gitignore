@@ -1,0 +1,36 @@
+# Build directories
+build/
+out/
+cmake-build-*/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.cache/
+compile_commands.json
+
+# Generated files
+*.o
+*.a
+*.so
+*.dylib
+*.dll
+*.lib
+*.exe
+
+# Dependencies
+third_party/*/
+!third_party/CMakeLists.txt
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Vulkan compiled shaders
+*.spv
