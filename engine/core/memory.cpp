@@ -9,10 +9,23 @@ namespace hz {
 // LinearArena Implementation
 // ============================================================================
 
-LinearArena::LinearArena(usize capacity)
-    : m_buffer(std::make_unique<std::byte[]>(capacity)), m_capacity(capacity), m_offset(0) {}
+LinearArena::LinearArena(usize capacity) : m_buffer(capacity) {}
 
 LinearArena::~LinearArena() = default;
+
+LinearArena::LinearArena(LinearArena&& other) noexcept
+    : m_buffer(std::move(other.m_buffer)), m_offset(other.m_offset) {
+    other.m_offset = 0;
+}
+
+LinearArena& LinearArena::operator=(LinearArena&& other) noexcept {
+    if (this != &other) {
+        m_buffer = std::move(other.m_buffer);
+        m_offset = other.m_offset;
+        other.m_offset = 0;
+    }
+    return *this;
+}
 
 void LinearArena::reset() noexcept {
     m_offset = 0;
@@ -22,13 +35,13 @@ void* LinearArena::do_allocate(usize bytes, usize alignment) {
     // Align the current offset
     usize aligned_offset = (m_offset + alignment - 1) & ~(alignment - 1);
 
-    if (aligned_offset + bytes > m_capacity) {
+    if (aligned_offset + bytes > m_buffer.size()) {
         HZ_ENGINE_ERROR("LinearArena out of memory: requested {} bytes, {} available", bytes,
-                        m_capacity - aligned_offset);
+                        m_buffer.size() - aligned_offset);
         throw std::bad_alloc();
     }
 
-    void* ptr = m_buffer.get() + aligned_offset;
+    std::byte* ptr = m_buffer.data() + aligned_offset;
     m_offset = aligned_offset + bytes;
     return ptr;
 }
@@ -81,12 +94,10 @@ void MemoryContext::reset_frame() {
 }
 
 std::pmr::memory_resource* MemoryContext::get(MemoryDomain domain) {
-    switch (domain) {
-    case MemoryDomain::Frame:
+    if (domain == MemoryDomain::Frame) {
         return s_frame_arena.get();
-    default:
-        return &s_general_pool;
     }
+    return &s_general_pool;
 }
 
 LinearArena& MemoryContext::frame_arena() {

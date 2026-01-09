@@ -44,7 +44,8 @@ public:
     ~LinearArena() override;
 
     HZ_NON_COPYABLE(LinearArena);
-    HZ_DEFAULT_MOVABLE(LinearArena);
+    LinearArena(LinearArena&& other) noexcept;
+    LinearArena& operator=(LinearArena&& other) noexcept;
 
     /**
      * @brief Reset the arena, invalidating all allocations
@@ -59,13 +60,14 @@ public:
     /**
      * @brief Get total capacity
      */
-    [[nodiscard]] usize capacity() const noexcept { return m_capacity; }
+    [[nodiscard]] usize capacity() const noexcept { return m_buffer.size(); }
 
     /**
      * @brief Get percentage of arena used
      */
     [[nodiscard]] f32 usage_percent() const noexcept {
-        return m_capacity > 0 ? static_cast<f32>(m_offset) / static_cast<f32>(m_capacity) : 0.0f;
+        return !m_buffer.empty() ? static_cast<f32>(m_offset) / static_cast<f32>(m_buffer.size())
+                                 : 0.0f;
     }
 
 protected:
@@ -74,8 +76,7 @@ protected:
     [[nodiscard]] bool do_is_equal(const memory_resource& other) const noexcept override;
 
 private:
-    std::unique_ptr<std::byte[]> m_buffer;
-    usize m_capacity{0};
+    std::vector<std::byte> m_buffer;
     usize m_offset{0};
 };
 
