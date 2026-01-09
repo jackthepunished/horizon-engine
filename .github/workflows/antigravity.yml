@@ -2,11 +2,11 @@ name: Antigravity Framework Integrity
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["master"]
     paths:
       - ".agent/**"
   pull_request:
-    branches: [ "main" ]
+    branches: ["master"]
     paths:
       - ".agent/**"
 
