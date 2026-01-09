@@ -1,0 +1,192 @@
+# ==============================================================================
+# Global Agent Rules - Antigravity Framework
+# ==============================================================================
+# These rules apply to ALL agents in the system.
+# Violation of any rule invalidates the entire analysis output.
+# ==============================================================================
+
+meta:
+  version: "1.0.0"
+  framework: "antigravity"
+  target: "horizon-engine"
+  standards:
+    - "C++20"
+    - "Vulkan 1.3"
+    - "OpenGL Core Profile"
+    - "GLSL 4.50"
+    - "SPIR-V 1.5"
+
+# ==============================================================================
+# Determinism Constraints
+# ==============================================================================
+determinism:
+  required: true
+  rules:
+    - id: "DET-001"
+      name: "no_speculation"
+      description: "Output must be derived from provided context only"
+      enforcement: "reject"
+
+    - id: "DET-002"
+      name: "no_randomness"
+      description: "Analysis must produce identical output for identical input"
+      enforcement: "reject"
+
+    - id: "DET-003"
+      name: "explicit_unknowns"
+      description: "Missing context must be explicitly stated as UNKNOWN"
+      enforcement: "reject"
+
+    - id: "DET-004"
+      name: "no_assumed_behavior"
+      description: "Driver, compiler, or platform behavior must not be assumed"
+      enforcement: "reject"
+
+# ==============================================================================
+# Forbidden Behaviors
+# ==============================================================================
+forbidden:
+  - id: "FRB-001"
+    behavior: "inventing_apis"
+    description: "Creating or referencing APIs not present in provided context"
+    enforcement: "reject"
+
+  - id: "FRB-002"
+    behavior: "driver_assumptions"
+    description: "Assuming driver-specific behavior without explicit documentation"
+    enforcement: "reject"
+
+  - id: "FRB-003"
+    behavior: "speculative_fixes"
+    description: "Proposing fixes without root-cause analysis"
+    enforcement: "reject"
+
+  - id: "FRB-004"
+    behavior: "conversational_output"
+    description: "Using informal language, hedging, or opinion-based statements"
+    enforcement: "reject"
+
+  - id: "FRB-005"
+    behavior: "large_refactors"
+    description: "Proposing architectural changes when minimal fix is sufficient"
+    enforcement: "warn"
+
+  - id: "FRB-006"
+    behavior: "placeholder_content"
+    description: "Including TODO, FIXME, or incomplete sections in output"
+    enforcement: "reject"
+
+  - id: "FRB-007"
+    behavior: "undefined_behavior_tolerance"
+    description: "Marking UB as acceptable under any circumstances"
+    enforcement: "reject"
+
+  - id: "FRB-008"
+    behavior: "implicit_conversions"
+    description: "Allowing narrowing or lossy implicit conversions"
+    enforcement: "reject"
+
+  - id: "FRB-009"
+    behavior: "unprofessional_formatting"
+    description: "Using emojis or casual formatting in documentation"
+    enforcement: "reject"
+
+# ==============================================================================
+# Output Format Requirements
+# ==============================================================================
+output_format:
+  structure: "structured_yaml"
+  sections:
+    - name: "classification"
+      required: true
+      description: "Issue category and severity"
+
+    - name: "location"
+      required: true
+      description: "File, line, and code reference"
+
+    - name: "analysis"
+      required: true
+      description: "Root-cause reasoning chain"
+
+    - name: "evidence"
+      required: true
+      description: "Spec references, validation output, or code proof"
+
+    - name: "suggestion"
+      required: false
+      description: "Minimal fix if analysis supports one"
+
+  severity_levels:
+    - level: "critical"
+      code: "CRIT"
+      description: "UB, memory corruption, security vulnerability"
+
+    - level: "error"
+      code: "ERR"
+      description: "Guaranteed incorrect behavior"
+
+    - level: "warning"
+      code: "WARN"
+      description: "Potential issue or spec violation"
+
+    - level: "info"
+      code: "INFO"
+      description: "Style, optimization, or best practice"
+
+# ==============================================================================
+# Analysis Requirements
+# ==============================================================================
+analysis_requirements:
+  - id: "ANL-001"
+    name: "root_cause_first"
+    description: "Identify root cause before suggesting any fix"
+    enforcement: "reject"
+
+  - id: "ANL-002"
+    name: "spec_citation"
+    description: "Reference relevant specification sections when applicable"
+    enforcement: "warn"
+
+  - id: "ANL-003"
+    name: "validation_authority"
+    description: "Validation layer output is authoritative for Vulkan/OpenGL"
+    enforcement: "reject"
+
+  - id: "ANL-004"
+    name: "minimal_diff"
+    description: "Prefer smallest correct change over comprehensive refactor"
+    enforcement: "warn"
+
+  - id: "ANL-005"
+    name: "context_bounds"
+    description: "State explicitly when analysis requires more context"
+    enforcement: "reject"
+
+# ==============================================================================
+# Code Quality Standards
+# ==============================================================================
+code_standards:
+  cpp:
+    standard: "C++20"
+    rules:
+      - "RAII for all resource management"
+      - "Explicit ownership via unique_ptr or shared_ptr"
+      - "No raw new/delete outside allocator implementations"
+      - "const-correctness enforced"
+      - "noexcept specification required for move operations"
+      - "[[nodiscard]] for non-void factory functions"
+
+  memory:
+    rules:
+      - "No manual memory management outside designated allocators"
+      - "Arena allocators must have explicit lifetime scopes"
+      - "Handle validity must be checked before dereference"
+      - "Generational handles preferred for pooled resources"
+
+  threading:
+    rules:
+      - "No data races permitted"
+      - "Lock ordering must be documented"
+      - "Atomic operations must specify memory ordering"
+      - "Thread-local storage usage must be justified"

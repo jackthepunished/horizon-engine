@@ -1,0 +1,78 @@
+# ==============================================================================
+# Shader Validation Workflow
+# ==============================================================================
+# Purpose: Static analysis of shader code (GLSL) and SPIR-V binary layout
+# Agents: Shader Agent, Vulkan Agent
+# Rules: global.rules.yaml, shader.rules.yaml, vulkan.rules.yaml
+# ==============================================================================
+
+name: "Shader Validation"
+description: "GLSL correctness, interface matching, and SPIR-V verification"
+version: "1.0.0"
+
+trigger:
+  files: ["assets/shaders/**/*.glsl", "assets/shaders/**/*.vert", "assets/shaders/**/*.frag", "assets/shaders/**/*.comp"]
+  extensions: [".glsl", ".vert", ".frag", ".geom", ".tesc", ".tese", ".comp"]
+
+context:
+  required:
+    - "shader_stage"
+    - "glsl_version"
+  optional:
+    - "pipeline_layout"
+    - "host_struct_definitions"
+
+steps:
+  - id: "STEP-001"
+    name: "compilation_verification"
+    intent: "analyze"
+    input: "target_file"
+    rules: ["shader.compilation"]
+    action:
+      - "dry_run_glslang"
+      - "verify_extensions"
+      - "check_version_compatibility"
+
+  - id: "STEP-002"
+    name: "interface_audit"
+    intent: "check"
+    input: "compilation_verification.output"
+    rules: ["shader.interface_matching", "shader.descriptor_binding"]
+    action:
+      - "extract_io_variables"
+      - "match_vertex_inputs"
+      - "verify_push_constant_ranges"
+      - "check_descriptor_set_indices"
+
+  - id: "STEP-003"
+    name: "memory_layout_check"
+    intent: "reason"
+    input: "interface_audit.output"
+    rules: ["shader.memory_layout"]
+    action:
+      - "validate_std140_std430"
+      - "check_struct_padding"
+      - "verify_array_strides"
+
+  - id: "STEP-004"
+    name: "host_compatibility"
+    intent: "verify"
+    input: "memory_layout_check.output"
+    rules: ["xml_host_definitions"]
+    action:
+      - "compare_host_device_structs"
+      - "verify_specialization_constants"
+
+  - id: "STEP-005"
+    name: "report_generation"
+    intent: "format"
+    input: "host_compatibility.output"
+    rules: ["output_format"]
+    action:
+      - "group_by_shader_stage"
+      - "map_to_source_lines"
+      - "suggest_layout_fixes"
+
+output:
+  format: "yaml"
+  schema: "global.output_format"

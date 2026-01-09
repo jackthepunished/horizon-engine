@@ -1,0 +1,223 @@
+# ==============================================================================
+# Vulkan Agent Rules - Antigravity Framework
+# ==============================================================================
+# Domain: Vulkan 1.3 API correctness, synchronization, validation
+# Specification: Vulkan 1.3.268
+# ==============================================================================
+
+meta:
+  agent: "vulkan"
+  version: "1.0.0"
+  extends: "global.rules.yaml"
+  domain:
+    - "vulkan-api-correctness"
+    - "synchronization-validation"
+    - "descriptor-management"
+    - "pipeline-configuration"
+  spec_reference: "https://registry.khronos.org/vulkan/specs/1.3/html/"
+
+# ==============================================================================
+# Issue Classifications
+# ==============================================================================
+classifications:
+  - id: "VK-SYNC"
+    name: "synchronization"
+    subcategories:
+      - "missing-barrier"
+      - "incorrect-stage-mask"
+      - "incorrect-access-mask"
+      - "hazard-read-after-write"
+      - "hazard-write-after-read"
+      - "hazard-write-after-write"
+      - "timeline-semaphore-misuse"
+      - "fence-unsignaled-wait"
+
+  - id: "VK-DESC"
+    name: "descriptor"
+    subcategories:
+      - "descriptor-not-bound"
+      - "descriptor-type-mismatch"
+      - "descriptor-count-mismatch"
+      - "dynamic-offset-invalid"
+      - "update-after-bind-violation"
+      - "descriptor-indexing-oob"
+
+  - id: "VK-PIPE"
+    name: "pipeline"
+    subcategories:
+      - "shader-stage-mismatch"
+      - "vertex-input-mismatch"
+      - "render-pass-incompatible"
+      - "dynamic-state-not-set"
+      - "push-constant-range-violation"
+      - "specialization-constant-invalid"
+
+  - id: "VK-CMD"
+    name: "command-buffer"
+    subcategories:
+      - "command-buffer-not-ended"
+      - "secondary-inheritance-invalid"
+      - "render-pass-state-invalid"
+      - "query-not-reset"
+      - "simultaneous-use-violation"
+
+  - id: "VK-MEM"
+    name: "memory"
+    subcategories:
+      - "memory-not-bound"
+      - "memory-type-invalid"
+      - "memory-map-invalid"
+      - "buffer-device-address-invalid"
+      - "sparse-binding-invalid"
+
+  - id: "VK-IMG"
+    name: "image"
+    subcategories:
+      - "layout-transition-invalid"
+      - "aspect-mask-invalid"
+      - "format-feature-missing"
+      - "sample-count-mismatch"
+      - "mip-level-invalid"
+
+  - id: "VK-VALID"
+    name: "validation"
+    subcategories:
+      - "validation-error"
+      - "best-practice-violation"
+      - "gpu-assisted-error"
+
+# ==============================================================================
+# Validation Layer Authority
+# ==============================================================================
+validation_authority:
+  statement: "Validation layer output is authoritative and must not be dismissed"
+  layers:
+    - "VK_LAYER_KHRONOS_validation"
+  error_handling:
+    on_vuids: "cite VUID and reproduce condition"
+    on_warnings: "document and assess impact"
+    on_info: "log for optimization review"
+
+# ==============================================================================
+# Synchronization Rules
+# ==============================================================================
+synchronization:
+  barriers:
+    - id: "SYNC-001"
+      rule: "Image layout transitions require appropriate barriers"
+      check: "vkCmdPipelineBarrier with VkImageMemoryBarrier"
+
+    - id: "SYNC-002"
+      rule: "Buffer writes visible to subsequent reads require barriers"
+      check: "srcAccessMask contains write, dstAccessMask contains read"
+
+    - id: "SYNC-003"
+      rule: "Stage masks must include stages that perform the access"
+      check: "srcStageMask/dstStageMask alignment with access type"
+
+  semaphores:
+    - id: "SYNC-004"
+      rule: "Binary semaphores must be signaled before wait"
+      check: "signal operation precedes wait operation"
+
+    - id: "SYNC-005"
+      rule: "Timeline semaphore values must be monotonically increasing"
+      check: "signal value > previous signal value"
+
+  fences:
+    - id: "SYNC-006"
+      rule: "Fence must be reset before reuse"
+      check: "vkResetFences called between signal and next wait"
+
+    - id: "SYNC-007"
+      rule: "Fence must be signaled or timeout specified on wait"
+      check: "vkWaitForFences timeout handling"
+
+# ==============================================================================
+# Descriptor Rules
+# ==============================================================================
+descriptors:
+  bindings:
+    - id: "DESC-001"
+      rule: "Descriptor set layout must match shader bindings"
+      check: "binding numbers and types match SPIR-V reflection"
+
+    - id: "DESC-002"
+      rule: "Descriptors must be updated before use"
+      check: "vkUpdateDescriptorSets precedes vkCmdBindDescriptorSets"
+
+    - id: "DESC-003"
+      rule: "Dynamic buffer offsets must be aligned"
+      check: "offset % minUniformBufferOffsetAlignment == 0"
+
+  pools:
+    - id: "DESC-004"
+      rule: "Descriptor pool must have sufficient capacity"
+      check: "poolSizeCount and maxSets adequate"
+
+# ==============================================================================
+# Pipeline Rules
+# ==============================================================================
+pipelines:
+  creation:
+    - id: "PIPE-001"
+      rule: "Pipeline layout must be compatible with shader"
+      check: "descriptor set layouts and push constant ranges match"
+
+    - id: "PIPE-002"
+      rule: "Vertex input state must match vertex shader inputs"
+      check: "location, format, binding match"
+
+    - id: "PIPE-003"
+      rule: "Render pass compatibility required for graphics pipelines"
+      check: "attachment formats and sample counts match"
+
+  dynamic_state:
+    - id: "PIPE-004"
+      rule: "Dynamic state must be set before draw"
+      check: "vkCmdSet* called for each dynamic state"
+
+# ==============================================================================
+# Command Buffer Rules
+# ==============================================================================
+command_buffers:
+  recording:
+    - id: "CMD-001"
+      rule: "Command buffer must be in recording state for commands"
+      check: "vkBeginCommandBuffer called, not ended"
+
+    - id: "CMD-002"
+      rule: "Render pass must be active for draw commands"
+      check: "vkCmdBeginRenderPass active"
+
+    - id: "CMD-003"
+      rule: "Compute commands require no active render pass"
+      check: "vkCmdBeginRenderPass not active"
+
+  submission:
+    - id: "CMD-004"
+      rule: "Command buffer must be ended before submission"
+      check: "vkEndCommandBuffer called"
+
+    - id: "CMD-005"
+      rule: "Wait semaphores must be signaled before submission completes"
+      check: "dependency chain validated"
+
+# ==============================================================================
+# Evidence Requirements
+# ==============================================================================
+evidence_requirements:
+  for_sync_claims:
+    - "cite Vulkan spec synchronization chapter"
+    - "show operation ordering"
+    - "identify missing synchronization primitive"
+
+  for_descriptor_claims:
+    - "show shader binding requirements"
+    - "show descriptor set configuration"
+    - "identify mismatch"
+
+  for_validation_errors:
+    - "cite VUID"
+    - "show triggering code path"
+    - "reference spec section"

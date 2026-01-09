@@ -1,0 +1,124 @@
+# ==============================================================================
+# OpenGL Agent Rules - Antigravity Framework
+# ==============================================================================
+# Domain: OpenGL 4.5+ Core Profile, DSA, Debug Output
+# Specification: OpenGL 4.6 (Core Profile)
+# ==============================================================================
+
+meta:
+  agent: "opengl"
+  version: "1.0.0"
+  extends: "global.rules.yaml"
+  domain:
+    - "opengl-api-correctness"
+    - "state-management"
+    - "shader-compilation"
+    - "resource-binding"
+  spec_reference: "https://registry.khronos.org/OpenGL/specs/gl/glspec46.core.pdf"
+
+# ==============================================================================
+# Issue Classifications
+# ==============================================================================
+classifications:
+  - id: "GL-STATE"
+    name: "state-management"
+    subcategories:
+      - "improper-binding"
+      - "missing-enable"
+      - "leaked-state"
+      - "pixel-store-mismatch"
+      - "client-side-array-usage"
+
+  - id: "GL-DSA"
+    name: "direct-state-access"
+    subcategories:
+      - "mixed-dsa-and-bind"
+      - "bind-to-edit-antipattern"
+      - "invalid-object-name"
+
+  - id: "GL-RES"
+    name: "resource-management"
+    subcategories:
+      - "texture-unit-conflict"
+      - "incomplete-fbo"
+      - "buffer-orphaning-failure"
+      - "immutable-storage-missing"
+
+  - id: "GL-ERR"
+    name: "error-handling"
+    subcategories:
+      - "missing-debug-callback"
+      - "gl-get-error-usage"
+      - "silent-failure"
+
+# ==============================================================================
+# Modern OpenGL Constraints (Core Profile)
+# ==============================================================================
+modern_practices:
+  dsa_enforcement:
+    - id: "GL-MOD-001"
+      rule: "Prefer Direct State Access (DSA) over bind-to-edit"
+      check: "glNamedBuffer* vs glBindBuffer + glBuffer*"
+      severity: "warning"
+
+  storage_immutability:
+    - id: "GL-MOD-002"
+      rule: "Use immutable storage for textures and buffers"
+      check: "glTexStorage* over glTexImage*"
+      severity: "warning"
+
+  debug_output:
+    - id: "GL-MOD-003"
+      rule: "Use KHR_debug/ARB_debug_output instead of glGetError"
+      check: "glDebugMessageCallback presence"
+      severity: "error"
+
+# ==============================================================================
+# State Validation
+# ==============================================================================
+state_validation:
+  pixel_store:
+    - id: "GL-ST-001"
+      rule: "GL_UNPACK_ALIGNMENT must match texture data row stride"
+      check: "glPixelStorei call before texture upload"
+
+  framebuffer:
+    - id: "GL-ST-002"
+      rule: "Framebuffer must be complete before use"
+      check: "glCheckFramebufferStatus or glCheckNamedFramebufferStatus"
+
+  vao:
+    - id: "GL-ST-003"
+      rule: "VAO must be bound for drawing (Core Profile)"
+      check: "non-zero VAO binding or DSA draw call"
+
+# ==============================================================================
+# Shader Integration
+# ==============================================================================
+shader_integration:
+  glsl_version:
+    - id: "GL-SH-001"
+      rule: "GLSL version must be compatible with GL context"
+      check: "#version 450 core or higher"
+
+  uniforms:
+    - id: "GL-SH-002"
+      rule: "Explicit uniform locations preferred"
+      check: "layout(location = N) uniform"
+
+# ==============================================================================
+# Evidence Requirements
+# ==============================================================================
+evidence_requirements:
+  for_state_claims:
+    - "show state setting call"
+    - "show draw/dispatch call"
+    - "identify discrepancy"
+
+  for_dsa_claims:
+    - "identify legacy bind-to-edit pattern"
+    - "suggest DSA equivalent (e.g., glNamedBufferSubData)"
+
+  for_completeness_claims:
+    - "cite FBO completeness rules"
+    - "show attachment configuration"

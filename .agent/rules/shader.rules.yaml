@@ -1,0 +1,257 @@
+# ==============================================================================
+# Shader Agent Rules - Antigravity Framework
+# ==============================================================================
+# Domain: GLSL/SPIR-V correctness, interface matching, resource binding
+# Standards: GLSL 4.50, SPIR-V 1.5, Vulkan GLSL
+# ==============================================================================
+
+meta:
+  agent: "shader"
+  version: "1.0.0"
+  extends: "global.rules.yaml"
+  domain:
+    - "glsl-correctness"
+    - "spirv-validation"
+    - "interface-matching"
+    - "resource-binding"
+  spec_references:
+    - "https://registry.khronos.org/OpenGL/specs/gl/GLSLangSpec.4.50.pdf"
+    - "https://registry.khronos.org/SPIR-V/specs/unified1/SPIRV.html"
+
+# ==============================================================================
+# Issue Classifications
+# ==============================================================================
+classifications:
+  - id: "SH-IFACE"
+    name: "interface"
+    subcategories:
+      - "location-mismatch"
+      - "type-mismatch"
+      - "interpolation-mismatch"
+      - "component-mismatch"
+      - "missing-output"
+      - "unmatched-input"
+
+  - id: "SH-BIND"
+    name: "binding"
+    subcategories:
+      - "set-out-of-range"
+      - "binding-collision"
+      - "descriptor-type-mismatch"
+      - "array-size-mismatch"
+      - "push-constant-overflow"
+
+  - id: "SH-UBO"
+    name: "uniform-buffer"
+    subcategories:
+      - "std140-violation"
+      - "std430-violation"
+      - "alignment-error"
+      - "size-mismatch"
+      - "member-offset-error"
+
+  - id: "SH-TEX"
+    name: "texture"
+    subcategories:
+      - "sampler-type-mismatch"
+      - "image-format-mismatch"
+      - "multisampled-mismatch"
+      - "combined-separate-mismatch"
+
+  - id: "SH-VERT"
+    name: "vertex-shader"
+    subcategories:
+      - "attribute-location-missing"
+      - "attribute-type-mismatch"
+      - "attribute-format-incompatible"
+      - "gl_Position-not-written"
+
+  - id: "SH-FRAG"
+    name: "fragment-shader"
+    subcategories:
+      - "output-location-missing"
+      - "output-type-mismatch"
+      - "depth-write-conflict"
+      - "discard-side-effects"
+
+  - id: "SH-COMP"
+    name: "compute-shader"
+    subcategories:
+      - "workgroup-size-invalid"
+      - "shared-memory-overflow"
+      - "barrier-divergence"
+
+  - id: "SH-SPIRV"
+    name: "spirv"
+    subcategories:
+      - "capability-missing"
+      - "extension-missing"
+      - "decoration-invalid"
+      - "entry-point-invalid"
+
+# ==============================================================================
+# Interface Matching Rules
+# ==============================================================================
+interface_matching:
+  vertex_to_fragment:
+    - id: "IFACE-001"
+      rule: "VS output locations must match FS input locations"
+      check: "layout(location = N) declarations match"
+
+    - id: "IFACE-002"
+      rule: "VS output types must match FS input types"
+      check: "vec4 output matches vec4 input, etc"
+
+    - id: "IFACE-003"
+      rule: "Interpolation qualifiers must match"
+      check: "flat, smooth, noperspective consistent"
+
+  vertex_input:
+    - id: "IFACE-004"
+      rule: "VS input locations must match vertex attribute descriptions"
+      check: "VkVertexInputAttributeDescription.location matches"
+
+    - id: "IFACE-005"
+      rule: "VS input types must be compatible with vertex formats"
+      check: "VK_FORMAT_* compatible with GLSL type"
+
+  fragment_output:
+    - id: "IFACE-006"
+      rule: "FS output locations must match color attachment indices"
+      check: "layout(location = N) matches attachment index"
+
+    - id: "IFACE-007"
+      rule: "FS output types must match attachment formats"
+      check: "vec4 for RGBA formats, float for R formats"
+
+# ==============================================================================
+# Descriptor Binding Rules
+# ==============================================================================
+descriptor_binding:
+  layout_qualifiers:
+    - id: "BIND-001"
+      rule: "set qualifier must be within device limits"
+      check: "set < maxBoundDescriptorSets"
+
+    - id: "BIND-002"
+      rule: "binding qualifier must be unique within set"
+      check: "no duplicate bindings in same set"
+
+    - id: "BIND-003"
+      rule: "Descriptor type must match usage in shader"
+      check: "uniform buffer vs storage buffer, sampler vs image"
+
+  push_constants:
+    - id: "BIND-004"
+      rule: "Push constant block size must not exceed limit"
+      check: "size <= maxPushConstantsSize"
+
+    - id: "BIND-005"
+      rule: "Push constant ranges must match pipeline layout"
+      check: "offset and size match VkPushConstantRange"
+
+# ==============================================================================
+# Memory Layout Rules
+# ==============================================================================
+memory_layout:
+  std140:
+    - id: "MEM-001"
+      rule: "vec3 padded to vec4 alignment"
+      alignment: 16
+      check: "offset calculation includes padding"
+
+    - id: "MEM-002"
+      rule: "struct members aligned to largest member"
+      check: "struct alignment >= max member alignment"
+
+    - id: "MEM-003"
+      rule: "arrays have element stride of vec4 minimum"
+      stride: 16
+      check: "array elements 16-byte aligned"
+
+  std430:
+    - id: "MEM-004"
+      rule: "vec3 not padded (tightly packed)"
+      alignment: 12
+      check: "no automatic padding"
+
+    - id: "MEM-005"
+      rule: "Arrays tightly packed"
+      check: "stride = sizeof(element)"
+
+  alignment_table:
+    scalar: 4
+    vec2: 8
+    vec3: 16  # std140, 12 in std430
+    vec4: 16
+    mat4: 64  # column-major, 4 vec4s
+
+# ==============================================================================
+# SPIR-V Validation Rules
+# ==============================================================================
+spirv_validation:
+  capabilities:
+    - id: "SPIRV-001"
+      rule: "Required capabilities must be declared"
+      check: "OpCapability for used features"
+
+    - id: "SPIRV-002"
+      rule: "Capability must be supported by target environment"
+      check: "Vulkan 1.3 capability matrix"
+
+  extensions:
+    - id: "SPIRV-003"
+      rule: "Required extensions must be enabled"
+      check: "OpExtension for used extensions"
+
+  entry_points:
+    - id: "SPIRV-004"
+      rule: "Entry point must exist for shader stage"
+      check: "OpEntryPoint with correct execution model"
+
+    - id: "SPIRV-005"
+      rule: "Entry point name must match pipeline creation"
+      check: "VkPipelineShaderStageCreateInfo.pName"
+
+# ==============================================================================
+# Compilation Rules
+# ==============================================================================
+compilation:
+  glslang:
+    - id: "COMP-001"
+      rule: "Target environment must match runtime"
+      flag: "--target-env vulkan1.3"
+
+    - id: "COMP-002"
+      rule: "SPIR-V version must be compatible"
+      flag: "--target-spv spv1.5"
+
+  spirv_tools:
+    - id: "COMP-003"
+      rule: "spirv-val must pass without errors"
+      check: "spirv-val --target-env vulkan1.3"
+
+# ==============================================================================
+# Evidence Requirements
+# ==============================================================================
+evidence_requirements:
+  for_interface_claims:
+    - "show both shader declarations"
+    - "identify location/type discrepancy"
+    - "reference GLSL spec section"
+
+  for_binding_claims:
+    - "show shader binding declarations"
+    - "show VkDescriptorSetLayout"
+    - "identify mismatch"
+
+  for_layout_claims:
+    - "show struct definition"
+    - "calculate expected layout with std140/std430"
+    - "show host-side struct definition"
+    - "identify offset discrepancy"
+
+  for_spirv_claims:
+    - "show spirv-val output"
+    - "reference SPIR-V spec section"
+    - "identify invalid instruction or decoration"

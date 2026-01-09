@@ -1,0 +1,78 @@
+# ==============================================================================
+# General Analysis Workflow
+# ==============================================================================
+# Purpose: Routine analysis of C++ code for core correctness and standards
+# Agents: C++ Core Agent
+# Rules: global.rules.yaml, cpp-core.rules.yaml
+# ==============================================================================
+
+name: "General Analysis"
+description: "Standard C++20 correctness and lifetime analysis"
+version: "1.0.0"
+
+trigger:
+  files: ["**/*.cpp", "**/*.hpp"]
+  excludes: ["third_party/**", "tests/**"]
+
+context:
+  required:
+    - "current_file_content"
+    - "included_headers"
+  optional:
+    - "function_call_graph"
+    - "class_hierarchy"
+
+steps:
+  - id: "STEP-001"
+    name: "context_gathering"
+    intent: "analyze"
+    input: "target_file"
+    action:
+      - "read_file"
+      - "parse_includes"
+      - "identify_dependencies"
+    validation:
+      - "check_file_exists"
+      - "check_permissions"
+
+  - id: "STEP-002"
+    name: "standards_verification"
+    intent: "classify"
+    input: "context_gathering.output"
+    rules: ["code_standards.cpp", "global.forbidden"]
+    action:
+      - "check_cpp_version_compatibility"
+      - "detect_forbidden_patterns"
+      - "verify_namespace_usage"
+
+  - id: "STEP-003"
+    name: "core_correctness"
+    intent: "reason"
+    input: "standards_verification.output"
+    rules: ["cpp-core", "code_standards.memory"]
+    substeps:
+      - name: "lifetime_analysis"
+        action: "trace_object_lifetimes"
+        focus: ["references", "pointers", "iterators"]
+
+      - name: "ownership_audit"
+        action: "verify_raii_compliance"
+        focus: ["unique_ptr", "shared_ptr", "raw_pointers"]
+
+      - name: "safety_check"
+        action: "detect_undefined_behavior"
+        focus: ["casts", "arithmetic", "buffer_access"]
+
+  - id: "STEP-004"
+    name: "synthesis"
+    intent: "format"
+    input: "core_correctness.output"
+    rules: ["output_format", "analysis_requirements"]
+    action:
+      - "aggregate_issues"
+      - "format_yaml_report"
+      - "filter_by_severity"
+
+output:
+  format: "yaml"
+  schema: "global.output_format"

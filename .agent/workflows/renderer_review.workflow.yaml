@@ -1,0 +1,86 @@
+# ==============================================================================
+# Renderer Review Workflow
+# ==============================================================================
+# Purpose: Specialized review of graphics engine code (Vulkan/OpenGL)
+# Agents: Vulkan Agent, OpenGL Agent, C++ Core Agent
+# Rules: global.rules.yaml, vulkan.rules.yaml, opengl.rules.yaml, cpp-core.rules.yaml
+# ==============================================================================
+
+name: "Renderer Review"
+description: "Graphics API correctness and resource management analysis"
+version: "1.0.0"
+
+trigger:
+  files: ["engine/renderer/**/*.cpp", "engine/renderer/**/*.hpp"]
+  patterns: ["*vk*", "*gl*", "*Render*", "*Pipeline*", "*Buffer*"]
+
+context:
+  required:
+    - "current_file_content"
+    - "graphics_api_version"
+    - "api_abstractions"
+  optional:
+    - "shader_manifest"
+    - "pipeline_layout_definitions"
+
+steps:
+  - id: "STEP-001"
+    name: "api_context_analysis"
+    intent: "analyze"
+    input: "target_file"
+    action:
+      - "identify_graphics_backend"
+      - "map_resource_handles"
+      - "trace_command_recording"
+
+  - id: "STEP-002"
+    name: "resource_validity"
+    intent: "check"
+    input: "api_context_analysis.output"
+    rules:
+      [
+        "vulkan.descriptors",
+        "vulkan.memory",
+        "opengl.resource-management",
+        "cpp-core.raii-violation",
+      ]
+    action:
+      - "verify_descriptor_lifetime"
+      - "check_buffer_usage_flags"
+      - "validate_image_layouts"
+      - "audit_resource_barriers"
+
+  - id: "STEP-003"
+    name: "synchronization_audit"
+    intent: "reason"
+    input: "resource_validity.output"
+    rules: ["vulkan.synchronization"]
+    action:
+      - "detect_pipeline_hazards"
+      - "verify_semaphore_signaling"
+      - "check_fence_cycling"
+      - "validate_render_pass_dependencies"
+
+  - id: "STEP-004"
+    name: "validation_compliance"
+    intent: "verify"
+    input: "synchronization_audit.output"
+    rules: ["vulkan.validation_authority", "opengl.error-handling"]
+    action:
+      - "cross_reference_vuids"
+      - "check_known_validation_errors"
+      - "verify_error_handling_logic"
+
+  - id: "STEP-005"
+    name: "report_generation"
+    intent: "format"
+    input: "validation_compliance.output"
+    rules: ["output_format"]
+    action:
+      - "prioritize_critical_hazards"
+      - "format_spec_citations"
+      - "generate_reproduction_steps"
+
+output:
+  format: "yaml"
+  schema: "global.output_format"

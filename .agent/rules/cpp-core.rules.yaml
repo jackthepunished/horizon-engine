@@ -1,0 +1,194 @@
+# ==============================================================================
+# C++ Core Agent Rules - Antigravity Framework
+# ==============================================================================
+# Domain: RAII, lifetime, UB, ownership, memory safety
+# Standard: C++20
+# ==============================================================================
+
+meta:
+  agent: "cpp-core"
+  version: "1.0.0"
+  extends: "global.rules.yaml"
+  domain:
+    - "lifetime-analysis"
+    - "ownership-verification"
+    - "undefined-behavior-detection"
+    - "raii-compliance"
+
+# ==============================================================================
+# Issue Classifications
+# ==============================================================================
+classifications:
+  - id: "CPP-LIFE"
+    name: "lifetime"
+    subcategories:
+      - "dangling-reference"
+      - "use-after-free"
+      - "use-after-move"
+      - "double-free"
+      - "stack-escape"
+      - "iterator-invalidation"
+
+  - id: "CPP-OWN"
+    name: "ownership"
+    subcategories:
+      - "ambiguous-ownership"
+      - "leaked-resource"
+      - "raw-pointer-ownership"
+      - "shared-ptr-cycle"
+      - "unique-ptr-aliasing"
+
+  - id: "CPP-UB"
+    name: "undefined-behavior"
+    subcategories:
+      - "signed-overflow"
+      - "null-dereference"
+      - "uninitialized-read"
+      - "out-of-bounds"
+      - "alignment-violation"
+      - "strict-aliasing"
+      - "sequence-point"
+
+  - id: "CPP-RAII"
+    name: "raii-violation"
+    subcategories:
+      - "manual-cleanup"
+      - "missing-destructor"
+      - "throwing-destructor"
+      - "incomplete-cleanup"
+
+  - id: "CPP-MEM"
+    name: "memory"
+    subcategories:
+      - "raw-new-delete"
+      - "allocation-failure"
+      - "buffer-overflow"
+      - "memory-leak"
+
+  - id: "CPP-MOVE"
+    name: "move-semantics"
+    subcategories:
+      - "moved-from-use"
+      - "missing-noexcept"
+      - "inefficient-copy"
+      - "self-move"
+
+# ==============================================================================
+# Detection Patterns
+# ==============================================================================
+detection_patterns:
+  dangling_reference:
+    triggers:
+      - "returning reference to local"
+      - "reference outlives referent"
+      - "capturing local by reference in escaping lambda"
+    severity: "critical"
+
+  use_after_move:
+    triggers:
+      - "read from moved-from object"
+      - "method call on moved-from object"
+    exceptions:
+      - "assignment to moved-from object"
+      - "destruction of moved-from object"
+    severity: "critical"
+
+  raw_new_delete:
+    triggers:
+      - "new expression outside allocator"
+      - "delete expression outside allocator"
+      - "new[] expression"
+      - "delete[] expression"
+    exceptions:
+      - "placement new for in-place construction"
+      - "custom allocator implementation"
+    severity: "error"
+
+  iterator_invalidation:
+    triggers:
+      - "container modification during iteration"
+      - "iterator use after container resize"
+      - "iterator use after element insertion"
+      - "iterator use after element erasure"
+    severity: "critical"
+
+  uninitialized_member:
+    triggers:
+      - "member not in initializer list"
+      - "conditional initialization path"
+    exceptions:
+      - "default member initializer present"
+      - "delegating constructor"
+    severity: "error"
+
+# ==============================================================================
+# Required Patterns
+# ==============================================================================
+required_patterns:
+  - id: "REQ-CPP-001"
+    name: "explicit_ownership"
+    description: "Resource-owning types must use RAII wrappers"
+    check: "unique_ptr | shared_ptr | custom_raii_type"
+
+  - id: "REQ-CPP-002"
+    name: "move_noexcept"
+    description: "Move constructor and assignment must be noexcept"
+    check: "noexcept specifier on move operations"
+
+  - id: "REQ-CPP-003"
+    name: "nodiscard_factories"
+    description: "Factory functions must be [[nodiscard]]"
+    check: "[[nodiscard]] attribute on factory return"
+
+  - id: "REQ-CPP-004"
+    name: "const_correctness"
+    description: "Methods not modifying state must be const"
+    check: "const qualifier on non-mutating methods"
+
+  - id: "REQ-CPP-005"
+    name: "span_for_ranges"
+    description: "Use std::span for non-owning contiguous ranges"
+    check: "std::span instead of pointer+size pairs"
+
+# ==============================================================================
+# Analysis Constraints
+# ==============================================================================
+analysis_constraints:
+  - id: "CON-CPP-001"
+    name: "trace_lifetime"
+    description: "Trace object lifetime through all control flow paths"
+    requirement: "mandatory"
+
+  - id: "CON-CPP-002"
+    name: "verify_ownership_transfer"
+    description: "Verify ownership semantics at function boundaries"
+    requirement: "mandatory"
+
+  - id: "CON-CPP-003"
+    name: "check_exception_safety"
+    description: "Verify resource cleanup on exception paths"
+    requirement: "mandatory"
+
+  - id: "CON-CPP-004"
+    name: "aliasing_analysis"
+    description: "Track pointer aliasing for mutation detection"
+    requirement: "when_applicable"
+
+# ==============================================================================
+# Evidence Requirements
+# ==============================================================================
+evidence_requirements:
+  for_ub_claims:
+    - "cite C++ standard section"
+    - "show execution path leading to UB"
+    - "identify specific undefined operation"
+
+  for_lifetime_claims:
+    - "show object creation point"
+    - "show object destruction point"
+    - "show access point violating lifetime"
+
+  for_ownership_claims:
+    - "identify owner at each program point"
+    - "show transfer or leak point"
+    - "reference ownership documentation if present"
