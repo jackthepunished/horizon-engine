@@ -7,6 +7,10 @@
 
 A modern **C++20 game engine** built for FPS games, featuring an Entity-Component-System architecture, PBR rendering pipeline, and action-based input system.
 
+I'm learning OpenGL, so this is a work in progress. Planning to migrate (or from zero)to Vulkan in the future.
+I'm using this project to learn and experiment with new technologies.
+Strictly keeping up with learnopengl.com
+
 ## Features
 
 ### Core Systems

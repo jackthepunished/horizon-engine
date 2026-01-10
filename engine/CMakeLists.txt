@@ -51,6 +51,9 @@ set(ENGINE_SOURCES
     # Audio
     audio/audio_engine.cpp
 
+    # Animation
+    animation/skeleton.cpp
+
     # GLAD (OpenGL loader)
     vendor/glad/glad.c
 )
