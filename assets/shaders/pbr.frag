@@ -17,6 +17,12 @@ uniform sampler2D u_ao_map;
 uniform sampler2D u_shadow_map;
 uniform sampler2D u_ssao_map;
 
+// IBL Textures
+uniform samplerCube u_irradiance_map;
+uniform samplerCube u_prefilter_map;
+uniform sampler2D u_brdf_lut;
+uniform bool u_use_ibl;
+
 // Toggles (for missing textures)
 uniform bool u_use_normal_map;
 uniform bool u_use_metallic_map;
@@ -24,11 +30,16 @@ uniform bool u_use_roughness_map;
 uniform bool u_use_ao_map;
 
 // Fallback values
+uniform vec3 u_albedo;
 uniform float u_metallic;
 uniform float u_roughness;
+uniform float u_ao;
+uniform float u_uv_scale;
+uniform bool u_use_textures;
 
 // Camera
 uniform vec3 u_cam_pos;
+uniform vec3 u_view_pos;
 uniform vec2 u_viewport_size;
 
 // Lights
@@ -51,6 +62,7 @@ uniform int u_point_light_count;
 uniform PointLight u_point_lights[MAX_POINT_LIGHTS];
 
 const float PI = 3.14159265359;
+const float MAX_REFLECTION_LOD = 4.0;
 
 // ============================================
 // PBR Functions
@@ -96,6 +108,11 @@ vec3 fresnel_schlick(float cos_theta, vec3 F0) {
     return F0 + (1.0 - F0) * pow(clamp(1.0 - cos_theta, 0.0, 1.0), 5.0);
 }
 
+// Fresnel with roughness for IBL
+vec3 fresnel_schlick_roughness(float cos_theta, vec3 F0, float roughness) {
+    return F0 + (max(vec3(1.0 - roughness), F0) - F0) * pow(clamp(1.0 - cos_theta, 0.0, 1.0), 5.0);
+}
+
 // Calculate Shadow
 float calculate_shadow(vec4 frag_pos_light_space, vec3 N, vec3 L) {
     // perform perspective divide
@@ -105,7 +122,6 @@ float calculate_shadow(vec4 frag_pos_light_space, vec3 N, vec3 L) {
     proj_coords = proj_coords * 0.5 + 0.5;
     
     // keep the shadow at 0.0 when outside the far_plane region of the light's frustum.
-    // Also protect against out of bounds sampling
     if(proj_coords.z > 1.0)
         return 0.0;
         
@@ -149,23 +165,35 @@ vec3 calculate_light(vec3 L, vec3 radiance, vec3 N, vec3 V, vec3 albedo,
 }
 
 void main() {
-    // Sample textures
-    vec3 albedo = pow(texture(u_albedo_map, v_texcoord).rgb, vec3(2.2)); // sRGB to linear
+    // UV scaling
+    vec2 scaled_uv = v_texcoord * u_uv_scale;
     
-    float metallic = u_use_metallic_map ? texture(u_metallic_map, v_texcoord).r : u_metallic;
-    float roughness = u_use_roughness_map ? texture(u_roughness_map, v_texcoord).r : u_roughness;
-    float ao = u_use_ao_map ? texture(u_ao_map, v_texcoord).r : 1.0;
+    // Sample textures or use fallback values
+    vec3 albedo;
+    if (u_use_textures) {
+        albedo = pow(texture(u_albedo_map, scaled_uv).rgb, vec3(2.2)); // sRGB to linear
+    } else {
+        albedo = u_albedo;
+    }
+    
+    float metallic = u_use_metallic_map ? texture(u_metallic_map, scaled_uv).r : u_metallic;
+    float roughness = u_use_roughness_map ? texture(u_roughness_map, scaled_uv).r : u_roughness;
+    roughness = max(roughness, 0.04); // Prevent divide by zero in specular
+    float ao = u_use_ao_map ? texture(u_ao_map, scaled_uv).r : u_ao;
     
     // Normal
     vec3 N;
     if (u_use_normal_map) {
-        N = texture(u_normal_map, v_texcoord).rgb * 2.0 - 1.0;
+        N = texture(u_normal_map, scaled_uv).rgb * 2.0 - 1.0;
         N = normalize(v_TBN * N);
     } else {
         N = normalize(v_TBN[2]);
     }
     
-    vec3 V = normalize(u_cam_pos - v_world_pos);
+    // View direction - use whichever uniform is set
+    vec3 cam_pos = length(u_cam_pos) > 0.0 ? u_cam_pos : u_view_pos;
+    vec3 V = normalize(cam_pos - v_world_pos);
+    vec3 R = reflect(-V, N);
     
     // Fresnel reflectance at normal incidence
     vec3 F0 = vec3(0.04); // Dielectric
@@ -189,12 +217,36 @@ void main() {
         Lo += calculate_light(L, radiance, N, V, albedo, metallic, roughness, F0);
     }
     
-    // Ambient (simple, could be IBL in future)
-    // Sample SSAO
+    // Ambient lighting
+    vec3 ambient;
+    
+    if (u_use_ibl) {
+        // IBL Ambient
+        vec3 F = fresnel_schlick_roughness(max(dot(N, V), 0.0), F0, roughness);
+        
+        vec3 kS = F;
+        vec3 kD = 1.0 - kS;
+        kD *= 1.0 - metallic;
+        
+        // Diffuse IBL
+        vec3 irradiance = texture(u_irradiance_map, N).rgb;
+        vec3 diffuse = irradiance * albedo;
+        
+        // Specular IBL
+        vec3 prefiltered_color = textureLod(u_prefilter_map, R, roughness * MAX_REFLECTION_LOD).rgb;
+        vec2 brdf = texture(u_brdf_lut, vec2(max(dot(N, V), 0.0), roughness)).rg;
+        vec3 specular = prefiltered_color * (F * brdf.x + brdf.y);
+        
+        ambient = (kD * diffuse + specular) * ao;
+    } else {
+        // Simple ambient fallback
+        ambient = u_ambient_light * albedo * ao;
+    }
+    
+    // SSAO
     vec2 screen_uv = gl_FragCoord.xy / u_viewport_size;
     float ssao_factor = texture(u_ssao_map, screen_uv).r;
-    
-    vec3 ambient = u_ambient_light * albedo * ao * ssao_factor;
+    ambient *= ssao_factor;
     
     vec3 color = ambient + Lo;
     

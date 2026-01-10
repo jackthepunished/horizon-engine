@@ -44,9 +44,10 @@ set(ENGINE_SOURCES
     renderer/renderer.cpp
     renderer/camera.cpp
     renderer/mesh.cpp
+    renderer/ibl.cpp
     renderer/opengl/buffer.cpp
     renderer/opengl/framebuffer.cpp
-    renderer/opengl/shader.cpp # Re-added buffer.cpp
+    renderer/opengl/shader.cpp
 
     # Audio
     audio/audio_engine.cpp
@@ -93,6 +94,7 @@ set(ENGINE_HEADERS
     renderer/renderer.hpp
     renderer/camera.hpp
     renderer/mesh.hpp
+    renderer/ibl.hpp
     renderer/opengl/gl_context.hpp
     renderer/opengl/shader.hpp
     renderer/opengl/buffer.hpp

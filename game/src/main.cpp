@@ -9,6 +9,7 @@
 #include "editor_ui.hpp"
 
 #include <backends/imgui_impl_opengl3.h>
+#include <engine/animation/animator.hpp>
 #include <engine/assets/asset_registry.hpp>
 #include <engine/assets/cubemap.hpp>
 #include <engine/assets/texture.hpp>
@@ -23,6 +24,7 @@
 #include <engine/renderer/camera.hpp>
 #include <engine/renderer/mesh.hpp>
 #include <engine/renderer/opengl/shader.hpp>
+#include <engine/renderer/ibl.hpp>
 #include <engine/renderer/render_utils.hpp>
 #include <engine/renderer/renderer.hpp>
 #include <engine/scene/components.hpp>
@@ -256,6 +258,17 @@ public:
         hz::TextureHandle skybox_tex_handle =
             assets.load_texture("assets/textures/skybox/hdri_night_12k.jpg");
 
+        // ==========================================
+        // Initialize IBL (Image-Based Lighting)
+        // ==========================================
+        hz::IBL ibl;
+        bool ibl_ready = ibl.generate("assets/textures/skybox/hdri_night_12k.jpg", 512);
+        if (ibl_ready) {
+            HZ_LOG_INFO("IBL initialized successfully!");
+        } else {
+            HZ_LOG_WARN("IBL initialization failed, falling back to simple ambient");
+        }
+
         hz::TextureHandle tex_handle = assets.load_texture("assets/textures/test.jpg");
         hz::TextureHandle normal_map_handle =
             assets.load_texture("assets/textures/wood_normal.png");
@@ -435,6 +448,17 @@ public:
             mc.albedo_color = glm::vec3(1.0f);
             mc.metallic = 0.5f;
             mc.roughness = 0.5f;
+
+            // Setup Skeletal Animation
+            if (weapon_model.has_skeleton()) {
+                auto& anim = world.add_component<hz::AnimatorComponent>(weapon_entity);
+                anim.skeleton = weapon_model.skeleton();
+
+                // Play first animation if available
+                if (!weapon_model.animations().empty()) {
+                    anim.play(weapon_model.animations()[0]);
+                }
+            }
         }
 
         // FPS tracking
@@ -472,6 +496,13 @@ public:
 
         loop.set_update_callback([&](hz::f64 dt) {
             float dt_f = static_cast<float>(dt);
+
+            // Update Animators
+            world.each_entity([&](hz::Entity entity) {
+                if (auto* animator = world.get_component<hz::AnimatorComponent>(entity)) {
+                    animator->update(dt_f);
+                }
+            });
 
             // Rotate Weapon
             if (world.is_alive(weapon_entity)) {
@@ -560,9 +591,10 @@ public:
                 waiting_to_reset = false;
             }
 
-            // Animate Point Light
+            // Animate Point Light (slow orbit)
+            float light_time = static_cast<float>(glfwGetTime()) * 0.3f; // 0.3x speed
             lighting.point_lights[0].position =
-                glm::vec3(3.0f * cos(fps_timer), 2.0f, 3.0f * sin(fps_timer));
+                glm::vec3(5.0f * cos(light_time), 2.0f, 5.0f * sin(light_time));
 
             // Camera movement
             glm::vec3 move_dir{0.0f};
@@ -729,6 +761,7 @@ public:
             pbr_shader.set_mat4("u_view_projection", projection * view);
             pbr_shader.set_mat4("u_light_space_matrix", light_space_matrix);
             pbr_shader.set_vec3("u_view_pos", camera.position());
+            pbr_shader.set_vec2("u_viewport_size", glm::vec2(static_cast<float>(width), static_cast<float>(height)));
 
             // Set Texture Slots (Must match what we bind below)
             pbr_shader.set_int("u_albedo_map", 0);
@@ -737,6 +770,17 @@ public:
             pbr_shader.set_int("u_roughness_map", 3);
             pbr_shader.set_int("u_ao_map", 4);
             pbr_shader.set_int("u_shadow_map", 5); // Shadow map at 5
+
+            // IBL Textures
+            pbr_shader.set_int("u_irradiance_map", 7);
+            pbr_shader.set_int("u_prefilter_map", 8);
+            pbr_shader.set_int("u_brdf_lut", 9);
+            pbr_shader.set_bool("u_use_ibl", ibl_ready);
+
+            // Bind IBL textures
+            if (ibl_ready) {
+                ibl.bind(7, 8, 9);
+            }
 
             pbr_shader.set_bool("u_use_normal_map", true);
             pbr_shader.set_bool("u_use_metallic_map", false);
@@ -819,6 +863,17 @@ public:
                     } else if (mc->mesh_path == "plane") {
                         ground_cube.draw();
                     } else if (mc->mesh_path == "assets/models/demon_weapon/scene.gltf") {
+                        // Setup animations for this entity
+                        auto* anim = world.get_component<hz::AnimatorComponent>(entity);
+                        if (anim && anim->skeleton && !anim->bone_transforms.empty()) {
+                            pbr_shader.set_bool("u_has_animations", true);
+                            pbr_shader.set_mat4_array(
+                                "u_bone_matrices", anim->bone_transforms.data(),
+                                static_cast<hz::u32>(anim->bone_transforms.size()));
+                        } else {
+                            pbr_shader.set_bool("u_has_animations", false);
+                        }
+
                         if (weapon_model.is_valid()) {
                             weapon_model.draw();
                         }

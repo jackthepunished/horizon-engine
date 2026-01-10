@@ -9,6 +9,7 @@
  */
 
 #include "engine/core/types.hpp"
+#include "engine/renderer/mesh.hpp"
 
 #include <string>
 #include <unordered_map>
@@ -19,10 +20,7 @@
 
 namespace hz {
 
-// Maximum bones per vertex (matches shader)
-constexpr u32 MAX_BONE_INFLUENCE = 4;
-// Maximum bones per skeleton (matches shader uniform array size)
-constexpr u32 MAX_BONES = 100;
+// Note: MAX_BONE_INFLUENCE is defined in mesh.hpp
 
 /**
  * @brief Bone vertex data for skinning
@@ -58,6 +56,9 @@ struct Bone {
     glm::vec3 position{0.0f};
     glm::quat rotation{1.0f, 0.0f, 0.0f, 0.0f};
     glm::vec3 scale{1.0f};
+
+    // Optimization: indices of child bones
+    std::vector<i32> children;
 
     [[nodiscard]] glm::mat4 get_local_transform() const;
 };

@@ -124,4 +124,9 @@ void Shader::set_mat4(std::string_view name, const glm::mat4& value) const {
     glUniformMatrix4fv(get_uniform_location(name), 1, GL_FALSE, glm::value_ptr(value));
 }
 
+void Shader::set_mat4_array(std::string_view name, const glm::mat4* values, u32 count) const {
+    glUniformMatrix4fv(get_uniform_location(name), static_cast<GLsizei>(count), GL_FALSE,
+                       glm::value_ptr(values[0]));
+}
+
 } // namespace hz::gl

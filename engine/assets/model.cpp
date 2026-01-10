@@ -104,6 +104,8 @@ void Model::draw() const {
 } // namespace hz
 
 // Re-open namespace for GLTF implementation
+#include <glm/gtc/type_ptr.hpp>
+
 namespace hz {
 
 Model Model::load_from_gltf(std::string_view path) {
@@ -130,6 +132,168 @@ Model Model::load_from_gltf(std::string_view path) {
 
     Model model;
     model.m_path = path;
+
+    // Helper to get buffer data
+    auto get_buffer_data = [&](const tinygltf::Accessor& accessor) -> const unsigned char* {
+        const auto& view = gltf_model.bufferViews[accessor.bufferView];
+        const auto& buffer = gltf_model.buffers[view.buffer];
+        return &buffer.data[view.byteOffset + accessor.byteOffset];
+    };
+
+    // Map node index to bone ID for animation linking
+    std::unordered_map<int, int> node_to_bone_id;
+
+    // 1. Load Skeleton (Skin)
+    if (!gltf_model.skins.empty()) {
+        const auto& skin = gltf_model.skins[0]; // Assuming one skin for now
+        auto skeleton = std::make_shared<Skeleton>();
+        model.m_skeleton = skeleton;
+
+        // Resize Accessors for IBM
+        const float* ibm_data = nullptr;
+        if (skin.inverseBindMatrices > -1) {
+            const auto& accessor = gltf_model.accessors[skin.inverseBindMatrices];
+            ibm_data = reinterpret_cast<const float*>(get_buffer_data(accessor));
+        }
+
+        // First pass: Create all bones flat
+        for (size_t i = 0; i < skin.joints.size(); ++i) {
+            int node_idx = skin.joints[i];
+            const auto& node = gltf_model.nodes[node_idx];
+
+            glm::mat4 ibm = glm::mat4(1.0f);
+            if (ibm_data) {
+                // GLTF IBMs are stored as 16 floats
+                ibm = glm::make_mat4(&ibm_data[i * 16]);
+            }
+
+            // Create bone with temporary parent -1
+            std::string bone_name = node.name.empty() ? "Bone_" + std::to_string(i) : node.name;
+            int bone_id = skeleton->add_bone(bone_name, -1, ibm);
+            node_to_bone_id[node_idx] = bone_id;
+
+            // Set initial local transform from node (bind pose)
+            Bone* bone = skeleton->get_bone(bone_id);
+            if (node.translation.size() == 3) {
+                bone->position =
+                    glm::vec3(node.translation[0], node.translation[1], node.translation[2]);
+            }
+            if (node.rotation.size() == 4) {
+                // GLTF quaternion is x, y, z, w
+                bone->rotation = glm::quat(static_cast<float>(node.rotation[3]),  // w
+                                           static_cast<float>(node.rotation[0]),  // x
+                                           static_cast<float>(node.rotation[1]),  // y
+                                           static_cast<float>(node.rotation[2])); // z
+            }
+            if (node.scale.size() == 3) {
+                bone->scale = glm::vec3(node.scale[0], node.scale[1], node.scale[2]);
+            }
+        }
+
+        // Second pass: Link parents
+        for (size_t i = 0; i < skin.joints.size(); ++i) {
+            int node_idx = skin.joints[i];
+            const auto& node = gltf_model.nodes[node_idx];
+            int current_bone_id = node_to_bone_id[node_idx];
+
+            for (int child_node_idx : node.children) {
+                // Check if child is part of the skeleton
+                if (node_to_bone_id.find(child_node_idx) != node_to_bone_id.end()) {
+                    int child_bone_id = node_to_bone_id[child_node_idx];
+                    Bone* child_bone = skeleton->get_bone(child_bone_id);
+                    child_bone->parent_id = current_bone_id;
+
+                    Bone* parent_bone = skeleton->get_bone(current_bone_id);
+                    if (parent_bone) {
+                        parent_bone->children.push_back(child_bone_id);
+                    }
+                }
+            }
+        }
+
+        HZ_ENGINE_INFO("Loaded Skeleton: {} bones", skeleton->bone_count());
+    }
+
+    // 2. Load Animations
+    for (const auto& gltf_anim : gltf_model.animations) {
+        auto clip = std::make_shared<AnimationClip>();
+        clip->name = gltf_anim.name;
+        clip->duration = 0.0f;
+
+        for (const auto& channel : gltf_anim.channels) {
+            if (node_to_bone_id.find(channel.target_node) == node_to_bone_id.end())
+                continue;
+
+            int bone_id = node_to_bone_id[channel.target_node];
+            const auto& node = gltf_model.nodes[channel.target_node];
+
+            Bone* bone = model.m_skeleton->get_bone(bone_id);
+            if (!bone)
+                continue;
+            std::string bone_name = bone->name;
+
+            // Find or create BoneAnimation channel
+            BoneAnimation* bone_anim = nullptr;
+            for (auto& ch : clip->channels) {
+                if (ch.bone_name == bone_name) {
+                    bone_anim = &ch;
+                    break;
+                }
+            }
+
+            if (!bone_anim) {
+                clip->channels.push_back({});
+                bone_anim = &clip->channels.back();
+                bone_anim->bone_name = bone_name;
+                bone_anim->bone_id = bone_id;
+            }
+
+            const auto& sampler = gltf_anim.samplers[channel.sampler];
+            const auto& input = gltf_model.accessors[sampler.input];   // Time
+            const auto& output = gltf_model.accessors[sampler.output]; // Value
+
+            const float* times = reinterpret_cast<const float*>(get_buffer_data(input));
+            const float* values = reinterpret_cast<const float*>(get_buffer_data(output));
+
+            // Track max duration
+            if (input.maxValues.size() > 0) {
+                float max_t = static_cast<float>(input.maxValues[0]);
+                if (max_t > clip->duration)
+                    clip->duration = max_t;
+            } else if (input.count > 0) {
+                if (times[input.count - 1] > clip->duration)
+                    clip->duration = times[input.count - 1];
+            }
+
+            // Target path
+            if (channel.target_path == "translation") {
+                for (size_t k = 0; k < input.count; ++k) {
+                    bone_anim->position_keys.push_back({times[k], glm::make_vec3(&values[k * 3])});
+                }
+            } else if (channel.target_path == "rotation") {
+                for (size_t k = 0; k < input.count; ++k) {
+                    // GLTF quat is x,y,z,w
+                    float x = values[k * 4 + 0];
+                    float y = values[k * 4 + 1];
+                    float z = values[k * 4 + 2];
+                    float w = values[k * 4 + 3];
+                    bone_anim->rotation_keys.push_back({times[k], glm::quat(w, x, y, z)});
+                }
+            } else if (channel.target_path == "scale") {
+                for (size_t k = 0; k < input.count; ++k) {
+                    bone_anim->scale_keys.push_back({times[k], glm::make_vec3(&values[k * 3])});
+                }
+            }
+        }
+
+        if (!clip->channels.empty()) {
+            model.m_animations.push_back(clip);
+        }
+    }
+
+    if (!model.m_animations.empty()) {
+        HZ_ENGINE_INFO("Loaded Animations: {}", model.m_animations.size());
+    }
 
     // Iterate over meshes
     for (const auto& gltf_mesh : gltf_model.meshes) {
@@ -197,7 +361,31 @@ Model Model::load_from_gltf(std::string_view path) {
                                                                 : sizeof(float) * 4;
             }
 
-            HZ_ENGINE_INFO("GLTF Primitive: {} vertices", pos_accessor.count);
+            // Joints & Weights
+            const void* joints_data = nullptr;
+            int joints_comp_type = 0;
+            int joints_stride = 0;
+            if (primitive.attributes.count("JOINTS_0")) {
+                const auto& acc =
+                    gltf_model.accessors[primitive.attributes.find("JOINTS_0")->second];
+                joints_data = get_buffer_data(acc);
+                joints_comp_type = acc.componentType;
+                joints_stride = acc.ByteStride(gltf_model.bufferViews[acc.bufferView]);
+                if (joints_stride == 0)
+                    joints_stride = 0; // Handled dynamically based on type
+            }
+
+            const float* weights_data = nullptr;
+            int weights_stride = 0;
+            if (primitive.attributes.count("WEIGHTS_0")) {
+                const auto& acc =
+                    gltf_model.accessors[primitive.attributes.find("WEIGHTS_0")->second];
+                weights_data = reinterpret_cast<const float*>(get_buffer_data(acc));
+                weights_stride =
+                    acc.ByteStride(gltf_model.bufferViews[acc.bufferView]) / sizeof(float);
+                if (weights_stride == 0)
+                    weights_stride = 4;
+            }
 
             // Vertices
             for (size_t i = 0; i < pos_accessor.count; ++i) {
@@ -225,10 +413,36 @@ Model Model::load_from_gltf(std::string_view path) {
                     v.tangent = glm::vec3(1.0f, 0.0f, 0.0f);
                 }
 
-                // Debug first vertex
-                if (i == 0) {
-                    HZ_ENGINE_INFO("  First Vertex: Pos({:.2f}, {:.2f}, {:.2f})", v.position.x,
-                                   v.position.y, v.position.z);
+                // Bone Data
+                if (joints_data && weights_data) {
+                    // Extract weights
+                    glm::vec4 w = glm::make_vec4(weights_data + i * weights_stride);
+
+                    // Extract joints based on component type
+                    int j[4] = {0, 0, 0, 0};
+                    if (joints_comp_type == TINYGLTF_COMPONENT_TYPE_UNSIGNED_BYTE) {
+                        const u8* ptr = static_cast<const u8*>(joints_data) +
+                                        i * (joints_stride ? joints_stride : 4);
+                        j[0] = ptr[0];
+                        j[1] = ptr[1];
+                        j[2] = ptr[2];
+                        j[3] = ptr[3];
+                    } else if (joints_comp_type == TINYGLTF_COMPONENT_TYPE_UNSIGNED_SHORT) {
+                        const u16* ptr =
+                            reinterpret_cast<const u16*>(static_cast<const u8*>(joints_data) +
+                                                         i * (joints_stride ? joints_stride : 8));
+                        j[0] = ptr[0];
+                        j[1] = ptr[1];
+                        j[2] = ptr[2];
+                        j[3] = ptr[3];
+                    }
+
+                    // Assign to vertex
+                    for (int k = 0; k < 4; k++) {
+                        if (w[k] > 0.0f) {
+                            v.add_bone(j[k], w[k]);
+                        }
+                    }
                 }
 
                 vertices.push_back(v);
@@ -264,7 +478,6 @@ Model Model::load_from_gltf(std::string_view path) {
                     }
                     indices.push_back(idx);
                 }
-                HZ_ENGINE_INFO("  Indices: {}", indices.size());
             }
 
             if (!vertices.empty()) {
@@ -273,7 +486,7 @@ Model Model::load_from_gltf(std::string_view path) {
         }
     }
 
-    HZ_ENGINE_INFO("Loaded GLTF Model: {} ({} meshes)", path, model.m_meshes.size());
+    HZ_ENGINE_INFO("Loaded GLTF: {} ({} meshes)", path, model.m_meshes.size());
     return model;
 }
 

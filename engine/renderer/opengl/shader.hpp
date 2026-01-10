@@ -67,6 +67,7 @@ public:
     void set_vec4(std::string_view name, const glm::vec4& value) const;
     void set_mat3(std::string_view name, const glm::mat3& value) const;
     void set_mat4(std::string_view name, const glm::mat4& value) const;
+    void set_mat4_array(std::string_view name, const glm::mat4* values, u32 count) const;
 
 private:
     [[nodiscard]] GLint get_uniform_location(std::string_view name) const;

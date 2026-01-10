@@ -179,11 +179,8 @@ void Skeleton::calculate_bone_transform_recursive(i32 bone_id, const AnimationCl
         m_global_inverse_transform * global_transform * bone->offset_matrix;
 
     // Recurse to children
-    for (const auto& child : m_bones) {
-        if (child.parent_id == bone_id) {
-            calculate_bone_transform_recursive(child.id, clip, time, global_transform,
-                                               out_transforms);
-        }
+    for (i32 child_id : bone->children) {
+        calculate_bone_transform_recursive(child_id, clip, time, global_transform, out_transforms);
     }
 }
 
