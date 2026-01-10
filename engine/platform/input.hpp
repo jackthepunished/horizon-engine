@@ -8,7 +8,6 @@
  * Supports FPS-style raw mouse input for camera control.
  */
 
-#include "engine/core/log.hpp"
 #include "engine/core/types.hpp"
 #include "window.hpp"
 

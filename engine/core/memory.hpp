@@ -10,13 +10,10 @@
  * - Subsystem pools: Isolated pools per subsystem
  */
 
-#include "log.hpp"
 #include "types.hpp"
 
-#include <array>
 #include <memory>
 #include <memory_resource>
-#include <span>
 #include <vector>
 
 namespace hz {

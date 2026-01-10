@@ -1,5 +1,9 @@
 #include "game_loop.hpp"
 
+#include "engine/platform/platform.hpp"
+#include "log.hpp"
+#include "memory.hpp"
+
 #include <algorithm>
 
 namespace hz {

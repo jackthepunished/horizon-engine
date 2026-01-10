@@ -10,9 +10,6 @@
  * - Variable rendering (with interpolation alpha)
  */
 
-#include "engine/platform/platform.hpp"
-#include "log.hpp"
-#include "memory.hpp"
 #include "types.hpp"
 
 #include <functional>

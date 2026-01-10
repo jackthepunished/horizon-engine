@@ -7,12 +7,10 @@
  * Provides a platform-independent window interface implemented with GLFW.
  */
 
-#include "engine/core/log.hpp"
 #include "engine/core/types.hpp"
 
 #include <functional>
 #include <string>
-#include <string_view>
 
 // Forward declare GLFW
 struct GLFWwindow;

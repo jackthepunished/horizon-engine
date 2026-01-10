@@ -1,6 +1,7 @@
 #include "memory.hpp"
 
-#include <algorithm>
+#include "log.hpp"
+
 #include <new>
 
 namespace hz {

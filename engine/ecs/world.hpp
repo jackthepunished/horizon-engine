@@ -7,7 +7,6 @@
 
 #include "component_storage.hpp"
 #include "engine/core/log.hpp"
-#include "engine/core/memory.hpp"
 #include "engine/core/types.hpp"
 #include "entity.hpp"
 #include "system.hpp"

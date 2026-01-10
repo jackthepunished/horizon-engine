@@ -11,7 +11,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <limits>
-#include <type_traits>
+#include <numbers>
 
 namespace hz {
 
@@ -65,15 +65,10 @@ struct Handle {
     constexpr Handle() = default;
     constexpr explicit Handle(T v) : value(v) {}
 
-    [[nodiscard]] constexpr bool is_valid() const noexcept {
-        return value != INVALID_VALUE;
-    }
+    [[nodiscard]] constexpr bool is_valid() const noexcept { return value != INVALID_VALUE; }
 
-    [[nodiscard]] constexpr explicit operator bool() const noexcept {
-        return is_valid();
-    }
+    [[nodiscard]] constexpr explicit operator bool() const noexcept { return is_valid(); }
 
-    [[nodiscard]] constexpr bool operator==(const Handle& other) const noexcept = default;
     [[nodiscard]] constexpr auto operator<=>(const Handle& other) const noexcept = default;
 };
 
@@ -99,18 +94,17 @@ struct GenerationalHandle {
         return index != INVALID_INDEX && generation != INVALID_GENERATION;
     }
 
-    [[nodiscard]] constexpr explicit operator bool() const noexcept {
-        return is_valid();
-    }
+    [[nodiscard]] constexpr explicit operator bool() const noexcept { return is_valid(); }
 
-    [[nodiscard]] constexpr bool operator==(const GenerationalHandle& other) const noexcept = default;
+    [[nodiscard]] constexpr bool
+    operator==(const GenerationalHandle& other) const noexcept = default;
 };
 
 // ============================================================================
 // Common Constants
 // ============================================================================
 
-inline constexpr f64 PI = 3.14159265358979323846;
+inline constexpr f64 PI = std::numbers::pi;
 inline constexpr f64 TAU = 2.0 * PI;
 inline constexpr f64 EPSILON = 1e-6;
 
@@ -120,16 +114,16 @@ inline constexpr f64 EPSILON = 1e-6;
 
 #define HZ_UNUSED(x) (void)(x)
 
-#define HZ_NON_COPYABLE(ClassName)             \
-    ClassName(const ClassName&) = delete;      \
+#define HZ_NON_COPYABLE(ClassName)                                                                 \
+    ClassName(const ClassName&) = delete;                                                          \
     ClassName& operator=(const ClassName&) = delete
 
-#define HZ_NON_MOVABLE(ClassName)              \
-    ClassName(ClassName&&) = delete;           \
+#define HZ_NON_MOVABLE(ClassName)                                                                  \
+    ClassName(ClassName&&) = delete;                                                               \
     ClassName& operator=(ClassName&&) = delete
 
-#define HZ_DEFAULT_MOVABLE(ClassName)          \
-    ClassName(ClassName&&) noexcept = default; \
+#define HZ_DEFAULT_MOVABLE(ClassName)                                                              \
+    ClassName(ClassName&&) noexcept = default;                                                     \
     ClassName& operator=(ClassName&&) noexcept = default
 
 } // namespace hz

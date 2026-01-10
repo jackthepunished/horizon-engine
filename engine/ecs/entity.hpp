@@ -10,6 +10,7 @@
 
 #include "engine/core/types.hpp"
 
+#include <functional>
 #include <limits>
 
 namespace hz {

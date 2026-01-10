@@ -9,13 +9,12 @@
  */
 
 #include "engine/core/log.hpp"
-#include "engine/core/memory.hpp"
 #include "engine/core/types.hpp"
 #include "entity.hpp"
 
-#include <concepts>
 #include <memory_resource>
-#include <typeindex>
+#include <span>
+#include <type_traits>
 #include <vector>
 
 namespace hz {

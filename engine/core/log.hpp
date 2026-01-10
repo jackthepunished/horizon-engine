@@ -11,7 +11,6 @@
 #include "types.hpp"
 
 #include <memory>
-#include <string_view>
 
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/spdlog.h>

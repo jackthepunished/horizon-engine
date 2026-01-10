@@ -1,6 +1,7 @@
 #include "world.hpp"
 
 #include <algorithm>
+#include <ranges>
 
 namespace hz {
 
@@ -89,20 +90,20 @@ bool World::is_alive(Entity entity) const {
 }
 
 void World::update(f64 dt) {
-    for (auto& system : m_systems) {
+    for (const auto& system : m_systems) {
         system->update(*this, dt);
     }
 }
 
 void World::clear() {
     // Unregister systems
-    for (auto& system : m_systems) {
+    for (const auto& system : m_systems) {
         system->on_unregister(*this);
     }
     m_systems.clear();
 
     // Clear components
-    for (auto& [type, storage] : m_component_storages) {
+    for (const auto& [type, storage] : m_component_storages) {
         storage->clear();
     }
     m_component_storages.clear();
@@ -112,12 +113,12 @@ void World::clear() {
 }
 
 void World::sort_systems() {
-    std::sort(m_systems.begin(), m_systems.end(),
-              [](const auto& a, const auto& b) { return a->priority() < b->priority(); });
+    std::ranges::sort(m_systems,
+                      [](const auto& a, const auto& b) { return a->priority() < b->priority(); });
 }
 
 void World::remove_entity_components(Entity entity) {
-    for (auto& [type, storage] : m_component_storages) {
+    for (const auto& [type, storage] : m_component_storages) {
         storage->remove(entity);
     }
 }

@@ -1,5 +1,7 @@
 #include "window.hpp"
 
+#include "engine/core/log.hpp"
+
 #include <stdexcept>
 #define GLFW_INCLUDE_NONE
 #include <GLFW/glfw3.h>
