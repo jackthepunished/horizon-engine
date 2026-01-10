@@ -15,8 +15,26 @@
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <vector>
 
 namespace hz {
+
+// ============================================================================
+// Transparent String Hash (for heterogeneous lookup)
+// ============================================================================
+
+struct StringHash {
+    using is_transparent = void;
+    [[nodiscard]] std::size_t operator()(std::string_view sv) const noexcept {
+        return std::hash<std::string_view>{}(sv);
+    }
+    [[nodiscard]] std::size_t operator()(const std::string& s) const noexcept {
+        return std::hash<std::string_view>{}(s);
+    }
+    [[nodiscard]] std::size_t operator()(const char* s) const noexcept {
+        return std::hash<std::string_view>{}(s);
+    }
+};
 
 // ============================================================================
 // Input Types
@@ -179,7 +197,7 @@ private:
     };
 
     std::vector<ActionData> m_actions;
-    std::unordered_map<std::string, ActionId> m_action_names;
+    std::unordered_map<std::string, ActionId, StringHash, std::equal_to<>> m_action_names;
     std::unordered_multimap<i32, ActionId> m_key_bindings;
     std::unordered_multimap<i32, ActionId> m_mouse_button_bindings;
 

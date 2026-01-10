@@ -48,6 +48,66 @@ FetchContent_Declare(
 )
 
 # ============================================================================
+# stb - Image Loading (header-only)
+# ============================================================================
+
+FetchContent_Declare(
+    stb
+    GIT_REPOSITORY https://github.com/nothings/stb.git
+    GIT_TAG master
+    GIT_SHALLOW TRUE
+)
+
+# ============================================================================
+# tinyobjloader - OBJ Model Loading (header-only)
+# ============================================================================
+
+FetchContent_Declare(
+    tinyobjloader
+    GIT_REPOSITORY https://github.com/tinyobjloader/tinyobjloader.git
+    GIT_TAG v2.0.0rc13
+    GIT_SHALLOW TRUE
+)
+
+# ============================================================================
+# JoltPhysics - Physics Engine
+# ============================================================================
+
+set(USE_STATIC_MSVC_RUNTIME_LIBRARY OFF CACHE BOOL "" FORCE)
+set(ENABLE_ALL_WARNINGS OFF CACHE BOOL "" FORCE)
+set(INTERPROCEDURAL_OPTIMIZATION OFF CACHE BOOL "" FORCE)
+
+FetchContent_Declare(
+    JoltPhysics
+    GIT_REPOSITORY https://github.com/jrouwe/JoltPhysics.git
+    GIT_TAG v5.0.0
+    GIT_SHALLOW TRUE
+    SOURCE_SUBDIR Build
+)
+
+# ============================================================================
+# Dear ImGui - UI Library
+# ============================================================================
+
+FetchContent_Declare(
+    imgui
+    GIT_REPOSITORY https://github.com/ocornut/imgui.git
+    GIT_TAG v1.90.4
+    GIT_SHALLOW TRUE
+)
+
+# ============================================================================
+# miniaudio - Audio Engine
+# ============================================================================
+
+FetchContent_Declare(
+    miniaudio
+    GIT_REPOSITORY https://github.com/mackron/miniaudio.git
+    GIT_TAG 0.11.21
+    GIT_SHALLOW TRUE
+)
+
+# ============================================================================
 # Catch2 - Testing (only if tests enabled)
 # ============================================================================
 
@@ -65,4 +125,32 @@ endif()
 # Make All Available
 # ============================================================================
 
-FetchContent_MakeAvailable(glfw glm spdlog)
+FetchContent_MakeAvailable(glfw glm spdlog stb tinyobjloader JoltPhysics imgui miniaudio)
+
+# Create interface libraries for header-only deps
+add_library(stb INTERFACE)
+target_include_directories(stb INTERFACE ${stb_SOURCE_DIR})
+
+add_library(tinyobj INTERFACE)
+target_include_directories(tinyobj INTERFACE ${tinyobjloader_SOURCE_DIR})
+
+add_library(miniaudio_lib INTERFACE)
+target_include_directories(miniaudio_lib INTERFACE ${miniaudio_SOURCE_DIR})
+
+# ImGui library (needs to be built as a static library)
+add_library(imgui_lib STATIC
+    ${imgui_SOURCE_DIR}/imgui.cpp
+    ${imgui_SOURCE_DIR}/imgui_draw.cpp
+    ${imgui_SOURCE_DIR}/imgui_demo.cpp
+    ${imgui_SOURCE_DIR}/imgui_tables.cpp
+    ${imgui_SOURCE_DIR}/imgui_widgets.cpp
+    ${imgui_SOURCE_DIR}/backends/imgui_impl_glfw.cpp
+    ${imgui_SOURCE_DIR}/backends/imgui_impl_opengl3.cpp
+)
+
+target_include_directories(imgui_lib PUBLIC
+    ${imgui_SOURCE_DIR}
+    ${imgui_SOURCE_DIR}/backends
+)
+
+target_link_libraries(imgui_lib PUBLIC glfw)

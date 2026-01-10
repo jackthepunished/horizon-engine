@@ -33,7 +33,7 @@ TEST_CASE("LinearArena basic operations", "[memory][arena]") {
     }
 
     SECTION("Reset clears allocations") {
-        arena.allocate(500, 8);
+        (void)arena.allocate(500, 8);
         REQUIRE(arena.used() > 0);
 
         arena.reset();
@@ -42,7 +42,7 @@ TEST_CASE("LinearArena basic operations", "[memory][arena]") {
 
     SECTION("Alignment is respected") {
         // Force misalignment
-        arena.allocate(3, 1);
+        (void)arena.allocate(3, 1);
 
         // Allocate with 16-byte alignment
         void* ptr = arena.allocate(32, 16);

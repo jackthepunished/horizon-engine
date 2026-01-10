@@ -159,9 +159,8 @@ public:
         }
 
         u32 dense_idx = m_sparse[entity.index];
-        u32 last_idx = static_cast<u32>(m_dense_entities.size()) - 1;
 
-        if (dense_idx != last_idx) {
+        if (u32 last_idx = static_cast<u32>(m_dense_entities.size()) - 1; dense_idx != last_idx) {
             // Swap with last element
             Entity last_entity = m_dense_entities[last_idx];
             m_dense_entities[dense_idx] = last_entity;

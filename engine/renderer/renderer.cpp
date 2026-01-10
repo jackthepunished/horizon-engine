@@ -1,5 +1,8 @@
 #include "renderer.hpp"
 
+#include "engine/core/log.hpp"
+#include "opengl/gl_context.hpp"
+
 namespace hz {
 
 Renderer::Renderer(Window& window) : m_window(&window) {

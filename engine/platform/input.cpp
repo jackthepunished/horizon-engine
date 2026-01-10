@@ -36,31 +36,32 @@ void InputManager::attach(Window& window) {
 }
 
 void InputManager::update() {
+    using enum ActionState;
     // Update action states based on raw_pressed
     for (auto& action : m_actions) {
         switch (action.state) {
-        case ActionState::Released:
+        case Released:
             if (action.raw_pressed) {
-                action.state = ActionState::JustPressed;
+                action.state = JustPressed;
             }
             break;
-        case ActionState::JustPressed:
+        case JustPressed:
             if (action.raw_pressed) {
-                action.state = ActionState::Held;
+                action.state = Held;
             } else {
-                action.state = ActionState::JustReleased;
+                action.state = JustReleased;
             }
             break;
-        case ActionState::Held:
+        case Held:
             if (!action.raw_pressed) {
-                action.state = ActionState::JustReleased;
+                action.state = JustReleased;
             }
             break;
-        case ActionState::JustReleased:
+        case JustReleased:
             if (action.raw_pressed) {
-                action.state = ActionState::JustPressed;
+                action.state = JustPressed;
             } else {
-                action.state = ActionState::Released;
+                action.state = Released;
             }
             break;
         }
@@ -88,7 +89,7 @@ void InputManager::update() {
 
 ActionId InputManager::register_action(std::string_view name) {
     auto id = static_cast<ActionId>(m_actions.size());
-    m_actions.push_back({std::string(name), ActionState::Released, false});
+    m_actions.emplace_back(std::string(name), ActionState::Released, false);
     m_action_names[std::string(name)] = id;
     return id;
 }
@@ -104,8 +105,7 @@ void InputManager::bind_mouse_button(ActionId action, i32 glfw_button) {
 }
 
 std::optional<ActionId> InputManager::find_action(std::string_view name) const {
-    auto it = m_action_names.find(std::string(name));
-    if (it != m_action_names.end()) {
+    if (auto it = m_action_names.find(name); it != m_action_names.end()) {
         return it->second;
     }
     return std::nullopt;
@@ -139,8 +139,8 @@ ActionState InputManager::get_action_state(ActionId action) const {
 void InputManager::on_key_event(const KeyEvent& event) {
     bool pressed = (event.action == GLFW_PRESS || event.action == GLFW_REPEAT);
 
-    auto range = m_key_bindings.equal_range(event.key);
-    for (auto it = range.first; it != range.second; ++it) {
+    auto [first, last] = m_key_bindings.equal_range(event.key);
+    for (auto it = first; it != last; ++it) {
         m_actions[it->second].raw_pressed = pressed;
     }
 }
@@ -148,8 +148,8 @@ void InputManager::on_key_event(const KeyEvent& event) {
 void InputManager::on_mouse_button_event(const MouseButtonEvent& event) {
     bool pressed = (event.action == GLFW_PRESS);
 
-    auto range = m_mouse_button_bindings.equal_range(event.button);
-    for (auto it = range.first; it != range.second; ++it) {
+    auto [first, last] = m_mouse_button_bindings.equal_range(event.button);
+    for (auto it = first; it != last; ++it) {
         m_actions[it->second].raw_pressed = pressed;
     }
 }

@@ -7,7 +7,6 @@
 
 #include "engine/core/types.hpp"
 #include "engine/platform/window.hpp"
-#include "opengl/gl_context.hpp"
 
 #include <glm/glm.hpp>
 
