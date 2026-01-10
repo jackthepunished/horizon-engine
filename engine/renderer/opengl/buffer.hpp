@@ -132,4 +132,28 @@ inline void set_vertex_attrib(const VertexAttribute& attr) {
                           reinterpret_cast<const void*>(attr.offset));
 }
 
+/**
+ * @brief Describes an integer vertex attribute (for bone IDs, etc.)
+ */
+struct IntVertexAttribute {
+    u32 index;
+    i32 size;    // 1, 2, 3, or 4 components
+    GLenum type; // GL_INT, GL_UNSIGNED_INT, etc.
+    usize stride;
+    usize offset;
+};
+
+/**
+ * @brief Configure integer vertex attribute pointer
+ *
+ * Note: Using glVertexAttribPointer since glVertexAttribIPointer may not be
+ * available in all GLAD configurations. Shader will receive as float.
+ */
+inline void set_vertex_attrib_int(const IntVertexAttribute& attr) {
+    glEnableVertexAttribArray(attr.index);
+    glVertexAttribPointer(attr.index, attr.size, attr.type, GL_FALSE,
+                          static_cast<GLsizei>(attr.stride),
+                          reinterpret_cast<const void*>(attr.offset));
+}
+
 } // namespace hz::gl

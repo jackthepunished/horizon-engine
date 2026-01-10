@@ -46,6 +46,21 @@ Mesh::Mesh(std::vector<Vertex> vertices, std::vector<u32> indices) {
                            .stride = sizeof(Vertex),
                            .offset = offsetof(Vertex, tangent)});
 
+    // Bone IDs attribute (location 4) - for skeletal animation
+    gl::set_vertex_attrib_int({.index = 4,
+                               .size = MAX_BONE_INFLUENCE,
+                               .type = GL_INT,
+                               .stride = sizeof(Vertex),
+                               .offset = offsetof(Vertex, bone_ids)});
+
+    // Bone weights attribute (location 5) - for skeletal animation
+    gl::set_vertex_attrib({.index = 5,
+                           .size = MAX_BONE_INFLUENCE,
+                           .type = GL_FLOAT,
+                           .normalized = false,
+                           .stride = sizeof(Vertex),
+                           .offset = offsetof(Vertex, bone_weights)});
+
     gl::VertexArray::unbind();
 }
 

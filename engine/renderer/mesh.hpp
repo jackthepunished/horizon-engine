@@ -14,14 +14,45 @@
 
 namespace hz {
 
+// Maximum bones influencing a single vertex (must match shader)
+constexpr int MAX_BONE_INFLUENCE = 4;
+
 /**
- * @brief Simple vertex structure for basic rendering
+ * @brief Vertex structure with skeletal animation support
  */
 struct Vertex {
     glm::vec3 position;
     glm::vec3 normal;
     glm::vec2 texcoord;
     glm::vec3 tangent; // For normal mapping (TBN matrix)
+
+    // Skeletal animation data
+    int bone_ids[MAX_BONE_INFLUENCE] = {-1, -1, -1, -1};
+    float bone_weights[MAX_BONE_INFLUENCE] = {0.0f, 0.0f, 0.0f, 0.0f};
+
+    /**
+     * @brief Add a bone influence to this vertex
+     */
+    void add_bone(int bone_id, float weight) {
+        for (int i = 0; i < MAX_BONE_INFLUENCE; ++i) {
+            if (bone_ids[i] < 0) {
+                bone_ids[i] = bone_id;
+                bone_weights[i] = weight;
+                return;
+            }
+        }
+        // All slots full - could replace lowest weight
+    }
+
+    /**
+     * @brief Reset bone data
+     */
+    void reset_bones() {
+        for (int i = 0; i < MAX_BONE_INFLUENCE; ++i) {
+            bone_ids[i] = -1;
+            bone_weights[i] = 0.0f;
+        }
+    }
 };
 
 /**
