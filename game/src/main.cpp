@@ -23,6 +23,7 @@
 #include <engine/renderer/camera.hpp>
 #include <engine/renderer/mesh.hpp>
 #include <engine/renderer/opengl/shader.hpp>
+#include <engine/renderer/render_utils.hpp>
 #include <engine/renderer/renderer.hpp>
 #include <engine/scene/components.hpp>
 #include <engine/scene/scene_serializer.hpp>
