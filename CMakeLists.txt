@@ -26,7 +26,7 @@ set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
 
 option(HZ_BUILD_TESTS "Build unit tests" ON)
 option(HZ_BUILD_GAME "Build sample game" ON)
-option(HZ_ENABLE_VALIDATION "Enable Vulkan validation layers" ON)
+
 option(HZ_HEADLESS "Build in headless mode (no GPU/window)" OFF)
 
 # ============================================================================
