@@ -137,7 +137,16 @@ cd build && ctest --output-on-failure
 - [x] **Milestone 4**: Physics (Jolt Integration)
 - [x] **Milestone 5**: Audio, AI, UI (Dear ImGui)
 - [x] **Milestone 6**: PBR Rendering, Materials, GLTF Loading
-- [ ] **Milestone 7**: Skeletal Animation, Advanced Lighting
+- [ ] **Milestone 7**: Skeletal Animation & Advanced Lighting
+  - Bone hierarchy & animation clips
+  - GPU skinning
+  - IBL (irradiance, prefiltered environment maps)
+  - Cascaded Shadow Maps
+- [ ] **Milestone 8**: Render Architecture & Optimization
+  - Render pass system (Geometry, Shadow, Lighting, Post)
+  - Frustum culling & instanced rendering
+  - GLTF material extraction
+- [ ] **Milestone 9**: Networking & Multiplayer _(optional)_
 
 ## License
 
