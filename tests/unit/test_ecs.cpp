@@ -186,8 +186,8 @@ TEST_CASE("World component management", "[ecs][world]") {
     SECTION("Add and get components") {
         Entity e = world.create_entity();
 
-        auto& pos = world.add_component<Position>(e, 1.0f, 2.0f, 3.0f);
-        auto& vel = world.add_component<Velocity>(e, 0.1f, 0.2f, 0.3f);
+        world.add_component<Position>(e, 1.0f, 2.0f, 3.0f);
+        world.add_component<Velocity>(e, 0.1f, 0.2f, 0.3f);
 
         REQUIRE(world.has_component<Position>(e));
         REQUIRE(world.has_component<Velocity>(e));
