@@ -16,11 +16,15 @@ graph TD
         C[Core] --> |memory, logging| ECS
         C --> |memory, logging| P[Platform]
         C --> |memory, logging| R[Renderer]
+        C --> |memory, logging| PH[Physics]
+        C --> |memory, logging| A[Audio]
+        C --> |memory, logging| U[UI]
 
         ECS[ECS] --> P
         ECS --> R
+        ECS --> PH
 
-        P --> |window, surface| R
+        P --> |window, context| R
     end
 
     G --> ECS
@@ -33,17 +37,17 @@ graph TD
 
 ### 1. RAII Everywhere
 
-All Vulkan objects are managed through move-only RAII wrappers:
+All OpenGL objects are managed through move-only RAII wrappers:
 
 ```cpp
-class VulkanDevice {
-    VkDevice m_device{VK_NULL_HANDLE};
+class Shader {
+    GLuint m_id{0};
 public:
-    ~VulkanDevice() {
-        if (m_device) vkDestroyDevice(m_device, nullptr);
+    ~Shader() {
+        if (m_id) glDeleteProgram(m_id);
     }
-    VulkanDevice(VulkanDevice&&) noexcept = default;
-    VulkanDevice(const VulkanDevice&) = delete;
+    Shader(Shader&&) noexcept = default;
+    Shader(const Shader&) = delete;
 };
 ```
 
@@ -83,25 +87,11 @@ while (running) {
 }
 ```
 
-## Frame Lifecycle
+## Render Lifecycle
 
 1. **Input Phase** - Poll window events, update input state
-2. **Update Phase** - Fixed timestep simulation (may run 0+ times)
-3. **Render Phase** - Submit GPU commands, present
-
-## Vulkan Lifetime Model
-
-```mermaid
-graph LR
-    I[Instance] --> D[Device]
-    I --> S[Surface]
-    D --> SC[Swapchain]
-    D --> CP[CommandPool]
-    SC --> IV[ImageViews]
-    CP --> CB[CommandBuffers]
-```
-
-All Vulkan objects destroyed in reverse order of creation.
+2. **Update Phase** - Fixed timestep simulation (Physics, Game Logic)
+3. **Render Phase** - Clear, Draw Opaque, Draw Transparent, Draw UI, Swap Buffers
 
 ## Testing Strategy
 
