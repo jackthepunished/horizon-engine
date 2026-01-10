@@ -38,9 +38,11 @@ struct AssetHandle {
 // Common handle types
 class Texture;
 class Model;
+struct Material;
 
 using TextureHandle = AssetHandle<Texture>;
 using ModelHandle = AssetHandle<Model>;
+using MaterialHandle = AssetHandle<Material>;
 
 } // namespace hz
 

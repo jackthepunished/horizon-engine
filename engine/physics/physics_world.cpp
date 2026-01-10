@@ -300,6 +300,15 @@ glm::quat PhysicsWorld::get_body_rotation(PhysicsBodyID body_id) const {
     return glm::quat(rot.GetW(), rot.GetX(), rot.GetY(), rot.GetZ());
 }
 
+void PhysicsWorld::set_body_position(PhysicsBodyID body_id, const glm::vec3& position) {
+    if (!m_initialized || !body_id.is_valid())
+        return;
+
+    auto& body_interface = m_physics_system->GetBodyInterface();
+    body_interface.SetPosition(body_id.id, JPH::RVec3(position.x, position.y, position.z),
+                               JPH::EActivation::Activate);
+}
+
 void PhysicsWorld::set_body_velocity(PhysicsBodyID body_id, const glm::vec3& velocity) {
     if (!m_initialized || !body_id.is_valid())
         return;

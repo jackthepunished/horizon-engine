@@ -213,6 +213,20 @@ GLAPI int gladLoadGLLoader(void* (*load)(const char* name));
 #define GL_STENCIL_ATTACHMENT 0x8D20
 #define GL_DEPTH_STENCIL_ATTACHMENT 0x821A
 #define GL_FRAMEBUFFER_COMPLETE 0x8CD5
+#define GL_FRAMEBUFFER_INCOMPLETE_ATTACHMENT 0x8CD6
+#define GL_FRAMEBUFFER_INCOMPLETE_MISSING_ATTACHMENT 0x8CD7
+#define GL_FRAMEBUFFER_INCOMPLETE_DRAW_BUFFER 0x8CDB
+#define GL_FRAMEBUFFER_INCOMPLETE_READ_BUFFER 0x8CDC
+#define GL_FRAMEBUFFER_UNSUPPORTED 0x8CDD
+
+/* Cubemap */
+#define GL_TEXTURE_CUBE_MAP 0x8513
+#define GL_TEXTURE_CUBE_MAP_POSITIVE_X 0x8515
+#define GL_TEXTURE_CUBE_MAP_NEGATIVE_X 0x8516
+#define GL_TEXTURE_CUBE_MAP_POSITIVE_Y 0x8517
+#define GL_TEXTURE_CUBE_MAP_NEGATIVE_Y 0x8518
+#define GL_TEXTURE_CUBE_MAP_POSITIVE_Z 0x8519
+#define GL_TEXTURE_CUBE_MAP_NEGATIVE_Z 0x851A
 
 /* Debug */
 #define GL_DEBUG_OUTPUT 0x92E0
@@ -353,6 +367,15 @@ GLAPI void(GLAPIENTRY* glFramebufferRenderbuffer)(GLenum target, GLenum attachme
 GLAPI void(GLAPIENTRY* glDebugMessageCallback)(GLDEBUGPROC callback, const void* userParam);
 GLAPI void(GLAPIENTRY* glDebugMessageControl)(GLenum source, GLenum type, GLenum severity,
                                               GLsizei count, const GLuint* ids, GLboolean enabled);
+
+/* Missing 4.1 Core functions */
+GLAPI void(GLAPIENTRY* glDrawBuffer)(GLenum buf);
+GLAPI void(GLAPIENTRY* glReadBuffer)(GLenum mode);
+GLAPI void(GLAPIENTRY* glTexParameterfv)(GLenum target, GLenum pname, const GLfloat* params);
+
+/* Missing Defines */
+#define GL_CLAMP_TO_BORDER 0x812D
+#define GL_TEXTURE_BORDER_COLOR 0x1004
 
 #ifdef __cplusplus
 }

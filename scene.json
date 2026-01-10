@@ -1,0 +1,27 @@
+{
+    "entities": [
+        {
+            "TagComponent": {
+                "tag": "Serialized Cube"
+            },
+            "TransformComponent": {
+                "position": [
+                    1.0,
+                    2.0,
+                    3.0
+                ],
+                "rotation": [
+                    0.0,
+                    45.0,
+                    0.0
+                ],
+                "scale": [
+                    1.0,
+                    1.0,
+                    1.0
+                ]
+            },
+            "id": 0
+        }
+    ]
+}

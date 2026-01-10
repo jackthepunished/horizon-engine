@@ -21,6 +21,7 @@ struct Vertex {
     glm::vec3 position;
     glm::vec3 normal;
     glm::vec2 texcoord;
+    glm::vec3 tangent; // For normal mapping (TBN matrix)
 };
 
 /**
@@ -48,6 +49,11 @@ public:
      * @brief Create a cube mesh
      */
     static Mesh create_cube(f32 size = 1.0f);
+
+    /**
+     * @brief Create a sphere mesh
+     */
+    static Mesh create_sphere(f32 radius, i32 slices = 32, i32 stacks = 16);
 
 private:
     gl::VertexArray m_vao;

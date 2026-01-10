@@ -32,6 +32,11 @@ public:
     [[nodiscard]] static Model load_from_obj(std::string_view path);
 
     /**
+     * @brief Load model from GLTF file
+     */
+    [[nodiscard]] static Model load_from_gltf(std::string_view path);
+
+    /**
      * @brief Draw all meshes
      */
     void draw() const;

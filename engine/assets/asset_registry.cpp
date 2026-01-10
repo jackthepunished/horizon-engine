@@ -125,6 +125,63 @@ bool AssetRegistry::reload_model(ModelHandle handle) {
 }
 
 // ============================================================================
+// Material Management
+// ============================================================================
+
+MaterialHandle AssetRegistry::create_material(const std::string& name, const Material& mat) {
+    // Check if already exists
+    auto it = m_material_name_to_index.find(name);
+    if (it != m_material_name_to_index.end()) {
+        auto& slot = m_materials[it->second];
+        return {it->second, slot.generation};
+    }
+
+    // Create new material
+    Material material = mat;
+    material.name = name;
+
+    u32 index = static_cast<u32>(m_materials.size());
+    m_materials.push_back({std::move(material), 1, name});
+    m_material_name_to_index[name] = index;
+
+    return {index, 1};
+}
+
+Material* AssetRegistry::get_material(MaterialHandle handle) {
+    if (handle.index >= m_materials.size())
+        return nullptr;
+    auto& slot = m_materials[handle.index];
+    if (slot.generation != handle.generation)
+        return nullptr;
+    return &slot.asset;
+}
+
+const Material* AssetRegistry::get_material(MaterialHandle handle) const {
+    if (handle.index >= m_materials.size())
+        return nullptr;
+    const auto& slot = m_materials[handle.index];
+    if (slot.generation != handle.generation)
+        return nullptr;
+    return &slot.asset;
+}
+
+MaterialHandle AssetRegistry::get_default_material() {
+    if (!m_default_material.is_valid()) {
+        m_default_material = create_material("__default__", Material::default_material());
+    }
+    return m_default_material;
+}
+
+MaterialHandle AssetRegistry::get_material_by_name(const std::string& name) {
+    auto it = m_material_name_to_index.find(name);
+    if (it == m_material_name_to_index.end()) {
+        return MaterialHandle::invalid();
+    }
+    auto& slot = m_materials[it->second];
+    return {it->second, slot.generation};
+}
+
+// ============================================================================
 // Sound Management
 // ============================================================================
 
@@ -159,6 +216,9 @@ void AssetRegistry::clear() {
     m_texture_path_to_index.clear();
     m_models.clear();
     m_model_path_to_index.clear();
+    m_materials.clear();
+    m_material_name_to_index.clear();
+    m_default_material = MaterialHandle::invalid();
     m_loaded_sounds.clear();
     HZ_ENGINE_INFO("Asset registry cleared");
 }

@@ -1,3 +1,10 @@
+# JSON
+FetchContent_Declare(
+    json
+    URL https://github.com/nlohmann/json/releases/download/v3.11.3/json.tar.xz
+)
+FetchContent_MakeAvailable(json)
+
 # ============================================================================
 # Horizon Engine Library
 # ============================================================================
@@ -16,10 +23,15 @@ set(ENGINE_SOURCES
     ecs/entity_manager.cpp
     ecs/world.cpp
 
+    # Scene
+    scene/components.cpp
+    scene/scene_serializer.cpp
+
     # Assets
     assets/texture.cpp
     assets/model.cpp
     assets/asset_registry.cpp
+    assets/cubemap.cpp
 
     # Physics
     physics/physics_world.cpp
@@ -32,8 +44,9 @@ set(ENGINE_SOURCES
     renderer/renderer.cpp
     renderer/camera.cpp
     renderer/mesh.cpp
-    renderer/opengl/shader.cpp
-    renderer/opengl/buffer.cpp # Re-added buffer.cpp
+    renderer/opengl/buffer.cpp
+    renderer/opengl/framebuffer.cpp
+    renderer/opengl/shader.cpp # Re-added buffer.cpp
 
     # Audio
     audio/audio_engine.cpp
@@ -99,6 +112,7 @@ target_link_libraries(horizon_engine
         glfw
         glm
         spdlog::spdlog
+        nlohmann_json::nlohmann_json
         imgui_lib
         miniaudio_lib
         Jolt

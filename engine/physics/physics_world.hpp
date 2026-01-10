@@ -92,6 +92,7 @@ public:
 
     [[nodiscard]] glm::vec3 get_body_position(PhysicsBodyID body_id) const;
     [[nodiscard]] glm::quat get_body_rotation(PhysicsBodyID body_id) const;
+    void set_body_position(PhysicsBodyID body_id, const glm::vec3& position);
     void set_body_velocity(PhysicsBodyID body_id, const glm::vec3& velocity);
     void apply_impulse(PhysicsBodyID body_id, const glm::vec3& impulse);
 

@@ -55,6 +55,19 @@ public:
      */
     void clear();
 
+    /**
+     * @brief Iterate over all alive entities
+     */
+    template <typename Func>
+    void each(Func func) const {
+        for (u32 i = 0; i < m_generations.size(); ++i) {
+            Entity e{i, m_generations[i]};
+            if (is_alive(e)) {
+                func(e);
+            }
+        }
+    }
+
 private:
     std::pmr::vector<u32> m_generations;
     std::pmr::vector<u32> m_free_indices;
@@ -102,6 +115,11 @@ public:
      * @brief Get the number of live entities
      */
     [[nodiscard]] usize entity_count() const { return m_entity_manager.count(); }
+
+    template <typename Func>
+    void each_entity(Func func) const {
+        m_entity_manager.each(func);
+    }
 
     // ========================================================================
     // Component Management

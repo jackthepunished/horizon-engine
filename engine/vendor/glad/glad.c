@@ -12,6 +12,12 @@ gladGLversionStruct GLVersion = {0, 0};
 void(GLAPIENTRY* glClear)(GLbitfield mask) = NULL;
 void(GLAPIENTRY* glClearColor)(GLfloat red, GLfloat green, GLfloat blue, GLfloat alpha) = NULL;
 void(GLAPIENTRY* glClearDepth)(GLdouble depth) = NULL;
+
+/* Missing 4.1 Core Definitions */
+void(GLAPIENTRY* glDrawBuffer)(GLenum buf) = NULL;
+void(GLAPIENTRY* glReadBuffer)(GLenum mode) = NULL;
+void(GLAPIENTRY* glTexParameterfv)(GLenum target, GLenum pname, const GLfloat* params) = NULL;
+
 void(GLAPIENTRY* glViewport)(GLint x, GLint y, GLsizei width, GLsizei height) = NULL;
 void(GLAPIENTRY* glEnable)(GLenum cap) = NULL;
 void(GLAPIENTRY* glDisable)(GLenum cap) = NULL;
@@ -106,24 +112,7 @@ void(GLAPIENTRY* glDebugMessageControl)(GLenum source, GLenum type, GLenum sever
 /* Type for function pointers */
 typedef void* (*GLloadproc)(const char* name);
 
-int gladLoadGLLoader(void* (*load)(const char* name)) {
-    if (!load)
-        return 0;
-
-    /* Get version string */
-    glGetString = (const GLubyte*(GLAPIENTRY*)(GLenum))load("glGetString");
-    if (!glGetString)
-        return 0;
-
-    const char* version = (const char*)glGetString(GL_VERSION);
-    if (!version)
-        return 0;
-
-    /* Parse version (format: "X.Y ...") */
-    GLVersion.major = version[0] - '0';
-    GLVersion.minor = version[2] - '0';
-
-    /* Load core functions */
+static void load_GL_version_4_1(GLloadproc load) {
     glClear = (void(GLAPIENTRY*)(GLbitfield))load("glClear");
     glClearColor = (void(GLAPIENTRY*)(GLfloat, GLfloat, GLfloat, GLfloat))load("glClearColor");
     glClearDepth = (void(GLAPIENTRY*)(GLdouble))load("glClearDepth");
@@ -212,11 +201,37 @@ int gladLoadGLLoader(void* (*load)(const char* name)) {
     glFramebufferRenderbuffer =
         (void(GLAPIENTRY*)(GLenum, GLenum, GLenum, GLuint))load("glFramebufferRenderbuffer");
 
-    /* Debug (may not be available on all systems) */
+    /* Debug */
     glDebugMessageCallback =
         (void(GLAPIENTRY*)(GLDEBUGPROC, const void*))load("glDebugMessageCallback");
     glDebugMessageControl = (void(GLAPIENTRY*)(GLenum, GLenum, GLenum, GLsizei, const GLuint*,
                                                GLboolean))load("glDebugMessageControl");
+
+    /* Added missing 4.1 functions */
+    glDrawBuffer = (void(GLAPIENTRY*)(GLenum))load("glDrawBuffer");
+    glReadBuffer = (void(GLAPIENTRY*)(GLenum))load("glReadBuffer");
+    glTexParameterfv = (void(GLAPIENTRY*)(GLenum, GLenum, const GLfloat*))load("glTexParameterfv");
+}
+
+int gladLoadGLLoader(void* (*load)(const char* name)) {
+    if (!load)
+        return 0;
+
+    /* Get version string */
+    glGetString = (const GLubyte*(GLAPIENTRY*)(GLenum))load("glGetString");
+    if (!glGetString)
+        return 0;
+
+    const char* version = (const char*)glGetString(GL_VERSION);
+    if (!version)
+        return 0;
+
+    /* Parse version (format: "X.Y ...") */
+    GLVersion.major = version[0] - '0';
+    GLVersion.minor = version[2] - '0';
+
+    /* Load core functions */
+    load_GL_version_4_1(load);
 
     return 1;
 }

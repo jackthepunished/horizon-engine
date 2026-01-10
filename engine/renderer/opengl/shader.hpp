@@ -59,20 +59,21 @@ public:
     // Uniform Setters
     // ========================================================================
 
-    void set_int(std::string_view name, i32 value);
-    void set_float(std::string_view name, f32 value);
-    void set_vec2(std::string_view name, const glm::vec2& value);
-    void set_vec3(std::string_view name, const glm::vec3& value);
-    void set_vec4(std::string_view name, const glm::vec4& value);
-    void set_mat3(std::string_view name, const glm::mat3& value);
-    void set_mat4(std::string_view name, const glm::mat4& value);
+    void set_bool(std::string_view name, bool value) const;
+    void set_int(std::string_view name, i32 value) const;
+    void set_float(std::string_view name, f32 value) const;
+    void set_vec2(std::string_view name, const glm::vec2& value) const;
+    void set_vec3(std::string_view name, const glm::vec3& value) const;
+    void set_vec4(std::string_view name, const glm::vec4& value) const;
+    void set_mat3(std::string_view name, const glm::mat3& value) const;
+    void set_mat4(std::string_view name, const glm::mat4& value) const;
 
 private:
-    [[nodiscard]] GLint get_uniform_location(std::string_view name);
+    [[nodiscard]] GLint get_uniform_location(std::string_view name) const;
     [[nodiscard]] static GLuint compile_shader(GLenum type, std::string_view source);
 
     GLuint m_program{0};
-    std::unordered_map<std::string, GLint> m_uniform_cache;
+    mutable std::unordered_map<std::string, GLint> m_uniform_cache;
 };
 
 } // namespace hz::gl
