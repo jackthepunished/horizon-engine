@@ -25,7 +25,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y ninja-build libx11-dev libxrandr-dev libxi-dev libwayland-dev libxkbcommon-dev
+          sudo apt-get install -y ninja-build libx11-dev libxrandr-dev libxi-dev libwayland-dev libxkbcommon-dev libxcontrol-dev libxinerama-dev
 
       - name: Install System Dependencies (macOS)
         if: runner.os == 'macOS'
