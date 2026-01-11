@@ -15,6 +15,35 @@ Water::~Water() {
     }
 }
 
+Water::Water(Water&& other) noexcept {
+    *this = std::move(other);
+}
+
+Water& Water::operator=(Water&& other) noexcept {
+    if (this == &other)
+        return *this;
+
+    // Release existing resources
+    if (m_vao) {
+        glDeleteVertexArrays(1, &m_vao);
+        glDeleteBuffers(1, &m_vbo);
+        glDeleteBuffers(1, &m_ebo);
+    }
+
+    m_config = other.m_config;
+    m_vao = other.m_vao;
+    m_vbo = other.m_vbo;
+    m_ebo = other.m_ebo;
+    m_index_count = other.m_index_count;
+
+    other.m_vao = 0;
+    other.m_vbo = 0;
+    other.m_ebo = 0;
+    other.m_index_count = 0;
+
+    return *this;
+}
+
 void Water::init(const WaterConfig& config) {
     m_config = config;
     create_mesh();

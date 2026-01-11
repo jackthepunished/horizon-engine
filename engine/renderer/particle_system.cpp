@@ -22,6 +22,41 @@ ParticleEmitter::~ParticleEmitter() {
     }
 }
 
+ParticleEmitter::ParticleEmitter(ParticleEmitter&& other) noexcept {
+    *this = std::move(other);
+}
+
+ParticleEmitter& ParticleEmitter::operator=(ParticleEmitter&& other) noexcept {
+    if (this == &other)
+        return *this;
+
+    if (m_vao) {
+        glDeleteVertexArrays(1, &m_vao);
+        glDeleteBuffers(1, &m_quad_vbo);
+        glDeleteBuffers(1, &m_instance_vbo);
+    }
+
+    m_config = other.m_config;
+    m_particles = std::move(other.m_particles);
+    m_instance_data = std::move(other.m_instance_data);
+    m_emitting = other.m_emitting;
+    m_emit_accumulator = other.m_emit_accumulator;
+    m_active_count = other.m_active_count;
+    m_rng = std::move(other.m_rng);
+
+    m_vao = other.m_vao;
+    m_quad_vbo = other.m_quad_vbo;
+    m_instance_vbo = other.m_instance_vbo;
+
+    other.m_vao = 0;
+    other.m_quad_vbo = 0;
+    other.m_instance_vbo = 0;
+    other.m_active_count = 0;
+    other.m_emit_accumulator = 0.0f;
+
+    return *this;
+}
+
 void ParticleEmitter::init(const ParticleEmitterConfig& config) {
     m_config = config;
     

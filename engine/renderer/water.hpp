@@ -38,7 +38,8 @@ public:
     ~Water();
 
     HZ_NON_COPYABLE(Water);
-    HZ_DEFAULT_MOVABLE(Water);
+    Water(Water&& other) noexcept;
+    Water& operator=(Water&& other) noexcept;
 
     /**
      * @brief Initialize water plane

@@ -130,7 +130,8 @@ bool PhysicsWorld::init() {
     JPH::RegisterDefaultAllocator();
 
     // Create factory
-    JPH::Factory::sInstance = new JPH::Factory();
+    m_factory = std::make_unique<JPH::Factory>();
+    JPH::Factory::sInstance = m_factory.get();
 
     // Register all types
     JPH::RegisterTypes();
@@ -179,7 +180,7 @@ void PhysicsWorld::shutdown() {
     m_broad_phase_layer_interface.reset();
 
     // Destroy factory
-    delete JPH::Factory::sInstance;
+    m_factory.reset();
     JPH::Factory::sInstance = nullptr;
 
     m_initialized = false;

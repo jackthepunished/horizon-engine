@@ -83,8 +83,14 @@ private:
     std::unique_ptr<Impl> m_impl;
     bool m_initialized{false};
 
+    struct SoundDeleter {
+        void operator()(ma_sound* sound) const;
+    };
+
+    using SoundPtr = std::unique_ptr<ma_sound, SoundDeleter>;
+
     // Keep track of sound resources
-    std::vector<void*> m_sounds; // void* to avoid exposing ma_sound in header
+    std::vector<SoundPtr> m_sounds;
 };
 
 } // namespace hz

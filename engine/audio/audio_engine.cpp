@@ -20,6 +20,13 @@ AudioSystem::~AudioSystem() {
     shutdown();
 }
 
+void AudioSystem::SoundDeleter::operator()(ma_sound* sound) const {
+    if (!sound)
+        return;
+    ma_sound_uninit(sound);
+    delete sound;
+}
+
 void AudioSystem::init() {
     if (m_initialized)
         return;
@@ -39,12 +46,7 @@ void AudioSystem::shutdown() {
     if (!m_initialized)
         return;
 
-    // Unload all sounds
-    for (void* sound_ptr : m_sounds) {
-        ma_sound* sound = static_cast<ma_sound*>(sound_ptr);
-        ma_sound_uninit(sound);
-        delete sound;
-    }
+    // Unload all sounds (deleter handles uninit + delete)
     m_sounds.clear();
 
     ma_engine_uninit(&m_impl->engine);
@@ -58,16 +60,16 @@ SoundHandle AudioSystem::load_sound(const std::string& path) {
         return {};
     }
 
-    ma_sound* sound = new ma_sound();
-    ma_result result = ma_sound_init_from_file(&m_impl->engine, path.c_str(), 0, NULL, NULL, sound);
+    auto sound = SoundPtr(new ma_sound());
+    auto result =
+        ma_sound_init_from_file(&m_impl->engine, path.c_str(), 0, NULL, NULL, sound.get());
 
     if (result != MA_SUCCESS) {
         HZ_ENGINE_ERROR("Failed to load sound: {}", path);
-        delete sound;
         return {};
     }
 
-    m_sounds.push_back(sound);
+    m_sounds.push_back(std::move(sound));
 
     // Generate simplified handle (using index for now)
     // Real system would use a better handle mechanism
@@ -83,7 +85,7 @@ void AudioSystem::play(SoundHandle handle, bool loop) {
     if (index >= m_sounds.size())
         return;
 
-    ma_sound* sound = static_cast<ma_sound*>(m_sounds[index]);
+    ma_sound* sound = m_sounds[index].get();
 
     // Reset cursor if not looping? Or just play.
     // miniaudio restart on start?
@@ -100,7 +102,7 @@ void AudioSystem::stop(SoundHandle handle) {
     if (index >= m_sounds.size())
         return;
 
-    ma_sound* sound = static_cast<ma_sound*>(m_sounds[index]);
+    ma_sound* sound = m_sounds[index].get();
     ma_sound_stop(sound);
 }
 

@@ -84,7 +84,8 @@ public:
     ~ParticleEmitter();
 
     HZ_NON_COPYABLE(ParticleEmitter);
-    HZ_DEFAULT_MOVABLE(ParticleEmitter);
+    ParticleEmitter(ParticleEmitter&& other) noexcept;
+    ParticleEmitter& operator=(ParticleEmitter&& other) noexcept;
 
     /**
      * @brief Initialize emitter
