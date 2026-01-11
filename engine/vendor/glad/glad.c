@@ -39,6 +39,13 @@ void(GLAPIENTRY* glBufferData)(GLenum target, GLsizeiptr size, const void* data,
 void(GLAPIENTRY* glBufferSubData)(GLenum target, GLintptr offset, GLsizeiptr size,
                                   const void* data) = NULL;
 
+void(GLAPIENTRY* glBindBufferBase)(GLenum target, GLuint index, GLuint buffer) = NULL;
+void(GLAPIENTRY* glBindBufferRange)(GLenum target, GLuint index, GLuint buffer, GLintptr offset,
+                                    GLsizeiptr size) = NULL;
+GLuint(GLAPIENTRY* glGetUniformBlockIndex)(GLuint program, const GLchar* uniformBlockName) = NULL;
+void(GLAPIENTRY* glUniformBlockBinding)(GLuint program, GLuint uniformBlockIndex,
+                                        GLuint uniformBlockBinding) = NULL;
+
 void(GLAPIENTRY* glGenVertexArrays)(GLsizei n, GLuint* arrays) = NULL;
 void(GLAPIENTRY* glDeleteVertexArrays)(GLsizei n, const GLuint* arrays) = NULL;
 void(GLAPIENTRY* glBindVertexArray)(GLuint array) = NULL;
@@ -46,6 +53,8 @@ void(GLAPIENTRY* glEnableVertexAttribArray)(GLuint index) = NULL;
 void(GLAPIENTRY* glDisableVertexAttribArray)(GLuint index) = NULL;
 void(GLAPIENTRY* glVertexAttribPointer)(GLuint index, GLint size, GLenum type, GLboolean normalized,
                                         GLsizei stride, const void* pointer) = NULL;
+void(GLAPIENTRY* glVertexAttribIPointer)(GLuint index, GLint size, GLenum type, GLsizei stride,
+                                         const void* pointer) = NULL;
 
 void(GLAPIENTRY* glDrawArrays)(GLenum mode, GLint first, GLsizei count) = NULL;
 void(GLAPIENTRY* glDrawElements)(GLenum mode, GLsizei count, GLenum type,
@@ -142,6 +151,14 @@ static void load_GL_version_4_1(GLloadproc load) {
     glBufferSubData =
         (void(GLAPIENTRY*)(GLenum, GLintptr, GLsizeiptr, const void*))load("glBufferSubData");
 
+    glBindBufferBase = (void(GLAPIENTRY*)(GLenum, GLuint, GLuint))load("glBindBufferBase");
+    glBindBufferRange =
+        (void(GLAPIENTRY*)(GLenum, GLuint, GLuint, GLintptr, GLsizeiptr))load("glBindBufferRange");
+    glGetUniformBlockIndex =
+        (GLuint(GLAPIENTRY*)(GLuint, const GLchar*))load("glGetUniformBlockIndex");
+    glUniformBlockBinding =
+        (void(GLAPIENTRY*)(GLuint, GLuint, GLuint))load("glUniformBlockBinding");
+
     glGenVertexArrays = (void(GLAPIENTRY*)(GLsizei, GLuint*))load("glGenVertexArrays");
     glDeleteVertexArrays = (void(GLAPIENTRY*)(GLsizei, const GLuint*))load("glDeleteVertexArrays");
     glBindVertexArray = (void(GLAPIENTRY*)(GLuint))load("glBindVertexArray");
@@ -149,6 +166,8 @@ static void load_GL_version_4_1(GLloadproc load) {
     glDisableVertexAttribArray = (void(GLAPIENTRY*)(GLuint))load("glDisableVertexAttribArray");
     glVertexAttribPointer = (void(GLAPIENTRY*)(GLuint, GLint, GLenum, GLboolean, GLsizei,
                                                const void*))load("glVertexAttribPointer");
+    glVertexAttribIPointer = (void(GLAPIENTRY*)(GLuint, GLint, GLenum, GLsizei, const void*))load(
+        "glVertexAttribIPointer");
 
     glDrawArrays = (void(GLAPIENTRY*)(GLenum, GLint, GLsizei))load("glDrawArrays");
     glDrawElements =

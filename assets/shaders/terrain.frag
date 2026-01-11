@@ -35,7 +35,8 @@ uniform bool u_use_ibl;
 
 // Lighting
 // Lights
-#include "common/lights.glsl"
+// Maps
+#include "common/scene_data.glsl"
 
 // Math & PBR
 #include "common/math.glsl"
@@ -45,7 +46,7 @@ uniform bool u_use_ibl;
 #include "common/fog.glsl"
 
 // Camera
-uniform vec3 u_view_pos;
+#include "common/camera.glsl"
 
 // Material properties
 uniform float u_roughness;
@@ -152,9 +153,9 @@ void main() {
     vec3 Lo = vec3(0.0);
     
     // Sun light
-    vec3 L = normalize(-u_sun.direction);
+    vec3 L = normalize(-u_sun.direction.xyz);
     vec3 H = normalize(V + L);
-    vec3 radiance = u_sun.color * u_sun.intensity;
+    vec3 radiance = u_sun.color.xyz * u_sun.intensity.x;
     
     float NDF = distribution_ggx(N, H, roughness);
     float G = geometry_smith(N, V, L, roughness);
@@ -173,14 +174,14 @@ void main() {
     
     // Point Lights
     for (int i = 0; i < u_point_light_count; ++i) {
-        vec3 L_point = normalize(u_point_lights[i].position - v_world_pos);
+        vec3 L_point = normalize(u_point_lights[i].position.xyz - v_world_pos);
         vec3 H_point = normalize(V + L_point);
         
-        float distance = length(u_point_lights[i].position - v_world_pos);
+        float distance = length(u_point_lights[i].position.xyz - v_world_pos);
         float attenuation = clamp(1.0 - (distance / u_point_lights[i].range), 0.0, 1.0);
         attenuation *= attenuation; // Quadratic falloff
         
-        vec3 point_radiance = u_point_lights[i].color * u_point_lights[i].intensity * attenuation;
+        vec3 point_radiance = u_point_lights[i].color.xyz * u_point_lights[i].intensity * attenuation;
         
         float NDF_p = distribution_ggx(N, H_point, roughness);
         float G_p = geometry_smith(N, V, L_point, roughness);
@@ -213,7 +214,7 @@ void main() {
         
         ambient = kD_ibl * diffuse + spec;
     } else {
-        ambient = u_ambient_light * albedo;
+        ambient = u_ambient_light.xyz * albedo;
     }
     
     // Apply Ambient Occlusion

@@ -10,8 +10,10 @@ layout(location = 3) in float a_instance_height;
 layout(location = 4) in float a_instance_rotation;
 layout(location = 5) in float a_instance_color_var;
 
-uniform mat4 u_view_projection;
-uniform vec3 u_camera_pos;
+#include "common/camera.glsl"
+
+// uniform mat4 u_view_projection; // In CameraData
+// uniform vec3 u_camera_pos;      // In CameraData as u_view_pos
 uniform float u_time;
 uniform float u_wind_strength;
 uniform float u_wind_speed;
@@ -56,7 +58,7 @@ void main() {
     local_pos = rotation_y(a_instance_rotation) * local_pos;
     
     // Billboard: make grass face camera (Y-axis rotation only)
-    vec3 to_camera = normalize(u_camera_pos - a_instance_position);
+    vec3 to_camera = normalize(u_view_pos - a_instance_position);
     float billboard_angle = atan(to_camera.x, to_camera.z);
     local_pos = rotation_y(billboard_angle) * local_pos;
     

@@ -18,6 +18,7 @@ namespace hz {
 namespace gl {
 class Shader;
 class Framebuffer;
+class UniformBuffer;
 } // namespace gl
 
 struct DirectionalLight {
@@ -58,6 +59,45 @@ struct ShadowSettings {
     float far_plane{50.0f};
     glm::vec3 light_pos_offset{-10.0f, 20.0f, -10.0f};
     glm::mat4 light_space_matrix;
+};
+
+// std140 compatible structs for UBOs
+struct CameraDataStd140 {
+    glm::mat4 view;
+    glm::mat4 projection;
+    glm::mat4 view_projection;
+    glm::vec4 view_pos;      // xyz = pos, w = pad
+    glm::vec4 viewport_size; // xy = size, zw = pad
+};
+
+struct DirectionalLightStd140 {
+    glm::vec4 direction; // w = pad
+    glm::vec4 color;     // w = pad
+    glm::vec4 intensity; // x = intensity, yzw = pad
+};
+
+struct PointLightStd140 {
+    glm::vec4 position; // w = pad
+    glm::vec4 color;    // w = pad
+    float intensity;
+    float range;
+    float pad[2]; // total 48 bytes
+};
+
+struct SceneDataStd140 {
+    DirectionalLightStd140 sun; // 48
+    glm::vec4 ambient_light;    // 16
+    float time;
+    int fog_enabled;
+    float fog_density;
+    float fog_gradient;
+    glm::vec4 fog_color;
+    int point_light_count;
+    float pad[3]; // align to 16 bytes for array start?
+                  // Offsets: sun(48), ambient(64), time(68), foge(72), fogd(76), fogg(80),
+                  // fogc(80->96), plc(96) Next multiple of 16 for array is 112. plc(96)+4=100. Diff
+                  // = 12 (3 floats).
+    PointLightStd140 point_lights[16];
 };
 
 /**
@@ -200,12 +240,21 @@ public:
     [[nodiscard]] u32 get_scene_texture_id() const;
     [[nodiscard]] u32 get_shadow_map_texture_id() const;
 
+    // UBOs
+    void update_camera(const glm::mat4& view, const glm::mat4& projection,
+                       const glm::vec3& view_pos);
+    void update_scene(float time);
+
 private:
     void init_quad();
+    void init_ubos();
 
     Window* m_window;
     glm::vec4 m_clear_color{0.1f, 0.1f, 0.15f, 1.0f};
     SceneLighting m_scene_lighting;
+
+    std::unique_ptr<gl::UniformBuffer> m_camera_ubo;
+    std::unique_ptr<gl::UniformBuffer> m_scene_ubo;
 
     // Shadows
     std::unique_ptr<gl::Framebuffer> m_shadow_fbo;

@@ -72,6 +72,11 @@ public:
     void set_mat4(std::string_view name, const glm::mat4& value) const;
     void set_mat4_array(std::string_view name, const glm::mat4* values, u32 count) const;
 
+    /**
+     * @brief Bind a named uniform block to a binding point
+     */
+    void bind_uniform_block(std::string_view name, u32 binding_point) const;
+
 private:
     [[nodiscard]] GLint get_uniform_location(std::string_view name) const;
     [[nodiscard]] static GLuint compile_shader(GLenum type, std::string_view source);

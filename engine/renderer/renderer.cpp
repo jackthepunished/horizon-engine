@@ -4,6 +4,7 @@
 #include "opengl/framebuffer.hpp"
 #include "opengl/gl_context.hpp"
 #include "opengl/shader.hpp"
+#include "opengl/uniform_buffer.hpp"
 
 #include <random>
 #include <string>
@@ -40,6 +41,7 @@ Renderer::Renderer(Window& window) : m_window(&window) {
 
     init_quad();
     init_ssao();
+    init_ubos();
 }
 
 Renderer::~Renderer() {
@@ -100,47 +102,12 @@ void Renderer::submit_lighting(const SceneLighting& lighting) {
 }
 
 void Renderer::apply_lighting(gl::Shader& shader) {
-    // Directional Light (Sun)
-    shader.set_vec3("u_sun.direction", m_scene_lighting.sun.direction);
-    shader.set_vec3("u_sun.color", m_scene_lighting.sun.color);
-    shader.set_float("u_sun.intensity", m_scene_lighting.sun.intensity);
+    // Bind UBOs
+    shader.bind_uniform_block("CameraData", 0);
+    shader.bind_uniform_block("SceneData", 1);
 
-    // Ambient
-    shader.set_vec3("u_ambient_light", m_scene_lighting.ambient_light);
-
-    // Point Lights
-    int point_count = static_cast<int>(m_scene_lighting.point_lights.size());
-    // Clamp to some reasonable max, e.g. 16, to match shader
-    if (point_count > 16)
-        point_count = 16;
-    shader.set_int("u_point_light_count", point_count);
-
-    for (int i = 0; i < point_count; ++i) {
-        std::string base = "u_point_lights[" + std::to_string(i) + "]";
-        const auto& light = m_scene_lighting.point_lights[static_cast<std::size_t>(i)];
-        shader.set_vec3(base + ".position", light.position);
-        shader.set_vec3(base + ".color", light.color);
-        shader.set_float(base + ".intensity", light.intensity);
-        shader.set_float(base + ".range", light.range);
-    }
-
-    // Spot Lights
-    int spot_count = static_cast<int>(m_scene_lighting.spot_lights.size());
-    if (spot_count > 16)
-        spot_count = 16;
-    shader.set_int("u_spot_light_count", spot_count);
-
-    for (int i = 0; i < spot_count; ++i) {
-        std::string base = "u_spot_lights[" + std::to_string(i) + "]";
-        const auto& light = m_scene_lighting.spot_lights[static_cast<std::size_t>(i)];
-        shader.set_vec3(base + ".position", light.position);
-        shader.set_vec3(base + ".direction", light.direction);
-        shader.set_vec3(base + ".color", light.color);
-        shader.set_float(base + ".intensity", light.intensity);
-        shader.set_float(base + ".range", light.range);
-        shader.set_float(base + ".cut_off", light.cut_off);
-        shader.set_float(base + ".outer_cut_off", light.outer_cut_off);
-    }
+    // Lights are now handled by UBO (SceneData)
+    // We only need to set shadow map matrix if valid
 
     // Shadows
     if (m_shadow_settings.enabled) {
@@ -554,6 +521,66 @@ void Renderer::render_texture(const gl::Shader& shader, u32 texture_id) {
     glBindVertexArray(m_quad_vao);
     glDrawArrays(GL_TRIANGLES, 0, 6);
     glBindVertexArray(0);
+}
+
+void Renderer::update_camera(const glm::mat4& view, const glm::mat4& projection,
+                             const glm::vec3& view_pos) {
+    if (!m_camera_ubo)
+        return;
+
+    CameraDataStd140 data;
+    data.view = view;
+    data.projection = projection;
+    data.view_projection = projection * view;
+    data.view_pos = glm::vec4(view_pos, 0.0f); // w unused
+
+    auto [width, height] = m_window->framebuffer_size();
+    data.viewport_size =
+        glm::vec4(static_cast<float>(width), static_cast<float>(height), 0.0f, 0.0f);
+
+    m_camera_ubo->set_data(data);
+}
+
+void Renderer::update_scene(float time) {
+    if (!m_scene_ubo)
+        return;
+
+    SceneDataStd140 data{};
+
+    // Sun
+    data.sun.direction = glm::vec4(m_scene_lighting.sun.direction, 0.0f);
+    data.sun.color = glm::vec4(m_scene_lighting.sun.color, 0.0f);
+    data.sun.intensity = glm::vec4(m_scene_lighting.sun.intensity, 0.0f, 0.0f, 0.0f);
+
+    // Ambient
+    data.ambient_light = glm::vec4(m_scene_lighting.ambient_light, 0.0f);
+
+    // Globals
+    data.time = time;
+    data.fog_enabled = 1;
+    data.fog_density = 0.008f;
+    data.fog_density = 0.008f;
+    data.fog_gradient = 1.5f;
+    data.fog_color = glm::vec4(m_clear_color); // Use clear color for fog
+
+    // Point Lights
+    int count = std::min(static_cast<int>(m_scene_lighting.point_lights.size()), 16);
+    data.point_light_count = count;
+
+    for (int i = 0; i < count; ++i) {
+        const auto& light = m_scene_lighting.point_lights[static_cast<std::size_t>(i)];
+        data.point_lights[i].position = glm::vec4(light.position, 1.0f);
+        data.point_lights[i].color = glm::vec4(light.color, 1.0f);
+        data.point_lights[i].intensity = light.intensity;
+        data.point_lights[i].range = light.range;
+    }
+
+    m_scene_ubo->set_data(data);
+}
+
+void Renderer::init_ubos() {
+    m_camera_ubo = std::make_unique<gl::UniformBuffer>(sizeof(CameraDataStd140), 0);
+    m_scene_ubo = std::make_unique<gl::UniformBuffer>(sizeof(SceneDataStd140), 1);
 }
 
 } // namespace hz

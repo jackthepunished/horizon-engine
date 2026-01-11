@@ -151,9 +151,10 @@ struct IntVertexAttribute {
  */
 inline void set_vertex_attrib_int(const IntVertexAttribute& attr) {
     glEnableVertexAttribArray(attr.index);
-    glVertexAttribPointer(attr.index, attr.size, attr.type, GL_FALSE,
-                          static_cast<GLsizei>(attr.stride),
-                          reinterpret_cast<const void*>(attr.offset));
+    // Correctly use glVertexAttribIPointer for integer attributes so they are not converted to
+    // floats.
+    glVertexAttribIPointer(attr.index, attr.size, attr.type, static_cast<GLsizei>(attr.stride),
+                           reinterpret_cast<const void*>(attr.offset));
 }
 
 } // namespace hz::gl

@@ -222,4 +222,14 @@ void Shader::set_mat4_array(std::string_view name, const glm::mat4* values, u32 
                        glm::value_ptr(values[0]));
 }
 
+void Shader::bind_uniform_block(std::string_view name, u32 binding_point) const {
+    std::string name_str(name);
+    GLuint block_index = glGetUniformBlockIndex(m_program, name_str.c_str());
+    if (block_index != GL_INVALID_INDEX) {
+        glUniformBlockBinding(m_program, block_index, binding_point);
+    } else {
+        HZ_ENGINE_WARN("Shader {}: Uniform block '{}' not found or active", m_program, name);
+    }
+}
+
 } // namespace hz::gl

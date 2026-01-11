@@ -24,6 +24,8 @@
 #include <engine/renderer/camera.hpp>
 #include <engine/renderer/grass.hpp>
 #include <engine/renderer/ibl.hpp>
+#include <engine/renderer/particle_system.hpp>
+#include <engine/renderer/water.hpp>
 #include <engine/renderer/mesh.hpp>
 #include <engine/renderer/opengl/shader.hpp>
 #include <engine/renderer/render_utils.hpp>
@@ -370,6 +372,59 @@ public:
             assets.load_texture("assets/textures/terrain/grass/grass_blade.png");
 
         // ==========================================
+        // Create Water
+        // ==========================================
+        hz::Water water;
+        hz::WaterConfig water_config;
+        water_config.size = 80.0f;
+        water_config.height = -3.0f;  // Water level
+        water_config.wave_strength = 0.2f;
+        water_config.wave_speed = 0.8f;
+        water_config.distortion_strength = 0.02f;
+        water_config.transparency = 0.7f;
+        water_config.water_color = glm::vec3(0.0f, 0.2f, 0.4f);         // Deep blue
+        water_config.water_color_shallow = glm::vec3(0.0f, 0.4f, 0.6f); // Light blue
+        water.init(water_config);
+        HZ_LOG_INFO("Water initialized: size={}, height={}", water_config.size, water_config.height);
+
+        // Load water shader
+        std::string water_vert = read_file("assets/shaders/water.vert");
+        std::string water_frag = read_file("assets/shaders/water.frag");
+        hz::gl::Shader water_shader(water_vert, water_frag);
+
+        // ==========================================
+        // Create Particle System
+        // ==========================================
+        hz::ParticleSystem particles;
+        
+        // Fire emitter - at a campfire location
+        auto fire_config = hz::ParticlePresets::fire();
+        fire_config.position = glm::vec3(10.0f, terrain.get_height_at(10.0f, 10.0f) - 4.5f, 10.0f);
+        fire_config.emit_rate = 80.0f;
+        hz::u32 fire_emitter = particles.create_emitter(fire_config);
+        
+        // Smoke emitter - above fire
+        auto smoke_config = hz::ParticlePresets::smoke();
+        smoke_config.position = fire_config.position + glm::vec3(0.0f, 1.5f, 0.0f);
+        smoke_config.emit_rate = 20.0f;
+        hz::u32 smoke_emitter = particles.create_emitter(smoke_config);
+        
+        // Sparkles emitter - magic effect at another location
+        auto sparkle_config = hz::ParticlePresets::sparkles();
+        sparkle_config.position = glm::vec3(-15.0f, terrain.get_height_at(-15.0f, -10.0f) - 2.0f, -10.0f);
+        hz::u32 sparkle_emitter = particles.create_emitter(sparkle_config);
+        
+        HZ_LOG_INFO("Particle system initialized with {} emitters", particles.emitter_count());
+        HZ_UNUSED(fire_emitter);
+        HZ_UNUSED(smoke_emitter);
+        HZ_UNUSED(sparkle_emitter);
+
+        // Load particle shader
+        std::string particle_vert = read_file("assets/shaders/particle.vert");
+        std::string particle_frag = read_file("assets/shaders/particle.frag");
+        hz::gl::Shader particle_shader(particle_vert, particle_frag);
+
+        // ==========================================
         // Load Plant Model (Periwinkle)
         // ==========================================
         hz::Model plant_model =
@@ -654,6 +709,9 @@ public:
             // Update physics
             physics.update(dt_f);
 
+            // Update particle system
+            particles.update(dt_f);
+
             // Animate Point Lights
             float t = static_cast<float>(glfwGetTime());
 
@@ -735,13 +793,18 @@ public:
             glm::mat4 view = camera.view_matrix();
             glm::mat4 projection = camera.projection_matrix(aspect);
 
+            // Update UBOs
+            renderer.update_camera(view, projection, camera.position());
+            renderer.update_scene(static_cast<float>(glfwGetTime()));
+
             // ========================================
             // 0. Geometry Pass (Render Normals/Depth)
             // ========================================
             renderer.begin_geometry_pass();
             geometry_shader.bind();
-            geometry_shader.set_mat4("u_view", view);
-            geometry_shader.set_mat4("u_projection", projection);
+            geometry_shader.bind_uniform_block("CameraData", 0);
+            // geometry_shader.set_mat4("u_view", view);       // Handled by UBO
+            // geometry_shader.set_mat4("u_projection", projection); // Handled by UBO
 
             // DRAW SCENE (OPAQUE ONLY)
             // Ideally we wrap this in a lambda or function
@@ -860,12 +923,11 @@ public:
             glBindTexture(GL_TEXTURE_2D, renderer.get_ssao_blur_texture_id());
 
             pbr_shader.bind();
-            renderer.apply_lighting(pbr_shader); // Apply light uniforms
-            pbr_shader.set_mat4("u_view_projection", projection * view);
+            renderer.apply_lighting(pbr_shader); // Apply light uniforms (Shadow only)
+            // pbr_shader.set_mat4("u_view_projection", projection * view); // UBO
+            // pbr_shader.set_vec3("u_view_pos", camera.position()); // UBO
             pbr_shader.set_mat4("u_light_space_matrix", light_space_matrix);
-            pbr_shader.set_vec3("u_view_pos", camera.position());
-            pbr_shader.set_vec2("u_viewport_size",
-                                glm::vec2(static_cast<float>(width), static_cast<float>(height)));
+            // pbr_shader.set_vec2("u_viewport_size", glm::vec2(width, height)); // UBO
 
             // Set Texture Slots (Must match what we bind below)
             pbr_shader.set_int("u_albedo_map", 0);
@@ -890,6 +952,7 @@ public:
             pbr_shader.set_bool("u_use_metallic_map", false);
             pbr_shader.set_bool("u_use_roughness_map", false);
             pbr_shader.set_bool("u_use_ao_map", false);
+            pbr_shader.set_bool("u_has_animations", false); // Default to false for static objects
             // pbr_shader.set_vec3("u_specular_color", glm::vec3(0.5f)); // PBR doesn't use specular
             // color like Phong pbr_shader.set_float("u_shininess", 32.0f);
 
@@ -984,6 +1047,9 @@ public:
                             if (weapon_model.is_valid()) {
                                 weapon_model.draw();
                             }
+                        } else {
+                            // Ensure animations are disabled for standard meshes (cube, plane, etc)
+                            pbr_shader.set_bool("u_has_animations", false);
                         }
 
                         // Reset Tiling
@@ -996,37 +1062,15 @@ public:
             // Render Terrain
             // ========================================
             terrain_shader.bind();
+            terrain_shader.bind_uniform_block("CameraData", 0);
+            terrain_shader.bind_uniform_block("SceneData", 1);
             // Lower the terrain by 5 units to make it feel more grounded
             glm::mat4 terrain_model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, -5.0f, 0.0f));
             terrain_shader.set_mat4("u_model", terrain_model);
-            terrain_shader.set_mat4("u_view_projection", projection * view);
             terrain_shader.set_mat4("u_light_space_matrix", light_space_matrix);
-            terrain_shader.set_vec3("u_view_pos", camera.position());
 
-            // Fog settings
-            terrain_shader.set_bool("u_fog_enabled", settings.fog_enabled);
-            terrain_shader.set_float("u_fog_density", settings.fog_density);
-            terrain_shader.set_vec3("u_fog_color", settings.clear_color);
-
-            // Lighting
-            terrain_shader.set_vec3("u_sun.direction", lighting.sun.direction);
-            terrain_shader.set_vec3("u_sun.color", lighting.sun.color);
-            terrain_shader.set_float("u_sun.intensity", lighting.sun.intensity);
-            terrain_shader.set_vec3("u_ambient_light", lighting.ambient_light);
-
-            // Point Lights for terrain
-            terrain_shader.set_int("u_point_light_count",
-                                   static_cast<int>(lighting.point_lights.size()));
-            for (size_t i = 0; i < lighting.point_lights.size(); ++i) {
-                std::string prefix = "u_point_lights[" + std::to_string(i) + "].";
-                terrain_shader.set_vec3((prefix + "position").c_str(),
-                                        lighting.point_lights[i].position);
-                terrain_shader.set_vec3((prefix + "color").c_str(), lighting.point_lights[i].color);
-                terrain_shader.set_float((prefix + "intensity").c_str(),
-                                         lighting.point_lights[i].intensity);
-                terrain_shader.set_float((prefix + "range").c_str(),
-                                         lighting.point_lights[i].range);
-            }
+            // Fog & Lighting handled by UBO
+            // Point lights handled by UBO
 
             // Material
             terrain_shader.set_float("u_roughness", 0.8f);
@@ -1090,8 +1134,10 @@ public:
             // Render 3D Grass
             // ========================================
             grass_shader.bind();
-            grass_shader.set_mat4("u_view_projection", projection * view);
-            grass_shader.set_vec3("u_camera_pos", camera.position());
+            grass_shader.bind_uniform_block("CameraData", 0);
+            grass_shader.bind_uniform_block("SceneData", 1);
+            // u_view_projection & u_camera_pos replaced by UBO
+
             grass_shader.set_float("u_time", static_cast<float>(glfwGetTime()));
             grass_shader.set_float("u_wind_strength", grass_config.wind_strength);
             grass_shader.set_float("u_wind_speed", grass_config.wind_speed);
@@ -1101,17 +1147,8 @@ public:
             grass_shader.set_vec3("u_base_color", glm::vec3(0.2f, 0.4f, 0.1f)); // Dark green base
             grass_shader.set_vec3("u_tip_color", glm::vec3(0.4f, 0.7f, 0.2f));  // Light green tips
 
-            // Lighting (Standardized)
-            grass_shader.set_vec3("u_sun.direction", lighting.sun.direction);
-            grass_shader.set_vec3("u_sun.color", lighting.sun.color);
-            grass_shader.set_float("u_sun.intensity", lighting.sun.intensity);
-            grass_shader.set_vec3("u_ambient_light", lighting.ambient_light);
-
-            // Fog & Camera
-            grass_shader.set_vec3("u_view_pos", camera.position());
-            grass_shader.set_bool("u_fog_enabled", settings.fog_enabled);
-            grass_shader.set_float("u_fog_density", settings.fog_density);
-            grass_shader.set_vec3("u_fog_color", settings.clear_color);
+            // Lighting & Fog handled by UBO
+            // grass_shader.set_vec3("u_view_pos", camera.position());
 
             // Bind grass blade texture
             grass_shader.set_int("u_grass_texture", 0);
@@ -1132,17 +1169,12 @@ public:
             // Render Plants (Periwinkle)
             // ========================================
             pbr_shader.bind();
-            pbr_shader.set_mat4("u_view", view);
-            pbr_shader.set_mat4("u_projection", projection);
+            // pbr_shader.set_mat4("u_view", view); // UBO
+            // pbr_shader.set_mat4("u_projection", projection); // UBO
             pbr_shader.set_mat4("u_light_space_matrix", light_space_matrix);
-            pbr_shader.set_vec3("u_view_pos", camera.position());
+            // pbr_shader.set_vec3("u_view_pos", camera.position()); // UBO
 
-            // Lighting for plants
-            pbr_shader.set_vec3("u_sun.direction", lighting.sun.direction);
-            pbr_shader.set_vec3("u_sun.color", lighting.sun.color);
-            pbr_shader.set_float("u_sun.intensity", lighting.sun.intensity);
-            pbr_shader.set_vec3("u_ambient_light", lighting.ambient_light);
-            pbr_shader.set_int("u_point_light_count", 0);
+            // Lighting handled by UBO
 
             // Bind Plant Textures
             pbr_shader.set_bool("u_use_textures", true);
@@ -1197,6 +1229,72 @@ public:
 
             pbr_shader.set_bool("u_instanced", false);
             glEnable(GL_CULL_FACE);
+
+            // ========================================
+            // Render Water
+            // ========================================
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+            
+            water_shader.bind();
+            water_shader.bind_uniform_block("CameraData", 0);
+            water_shader.bind_uniform_block("SceneData", 1);
+            
+            glm::mat4 water_model = glm::translate(glm::mat4(1.0f), glm::vec3(0.0f, 0.0f, 0.0f));
+            water_shader.set_mat4("u_model", water_model);
+            // u_time comes from SceneData UBO
+            water_shader.set_float("u_wave_strength", water.config().wave_strength);
+            water_shader.set_float("u_wave_speed", water.config().wave_speed);
+            water_shader.set_float("u_distortion_strength", water.config().distortion_strength);
+            water_shader.set_float("u_shine_damper", water.config().shine_damper);
+            water_shader.set_float("u_reflectivity", water.config().reflectivity);
+            water_shader.set_float("u_transparency", water.config().transparency);
+            water_shader.set_float("u_depth_multiplier", water.config().depth_multiplier);
+            water_shader.set_vec3("u_water_color", water.config().water_color);
+            water_shader.set_vec3("u_water_color_shallow", water.config().water_color_shallow);
+            
+            // For now, bind scene texture as both reflection/refraction (simple effect)
+            // Full implementation would require separate render passes
+            glActiveTexture(GL_TEXTURE0);
+            glBindTexture(GL_TEXTURE_2D, renderer.get_scene_texture_id());
+            water_shader.set_int("u_reflection_texture", 0);
+            water_shader.set_int("u_refraction_texture", 0);
+            water_shader.set_int("u_dudv_map", 0);      // Reuse for now
+            water_shader.set_int("u_normal_map", 0);    // Reuse for now
+            water_shader.set_int("u_depth_texture", 0); // Reuse for now
+            
+            water.draw();
+            glDisable(GL_BLEND);
+
+            // ========================================
+            // Render Particles
+            // ========================================
+            glEnable(GL_BLEND);
+            glDepthMask(GL_FALSE); // Don't write to depth buffer
+            
+            particle_shader.bind();
+            particle_shader.bind_uniform_block("CameraData", 0);
+            particle_shader.set_bool("u_use_texture", false);
+            
+            // Draw fire (additive blend)
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE); // Additive for fire
+            particle_shader.set_bool("u_additive_blend", true);
+            if (auto* emitter = particles.get_emitter(fire_emitter)) {
+                emitter->draw();
+            }
+            if (auto* emitter = particles.get_emitter(sparkle_emitter)) {
+                emitter->draw();
+            }
+            
+            // Draw smoke (normal blend)
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+            particle_shader.set_bool("u_additive_blend", false);
+            if (auto* emitter = particles.get_emitter(smoke_emitter)) {
+                emitter->draw();
+            }
+            
+            glDepthMask(GL_TRUE);
+            glDisable(GL_BLEND);
 
             // ========================================
             // Render Skybox (last, with depth = 1.0)

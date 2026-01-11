@@ -7,13 +7,14 @@ in vec3 v_world_pos;
 
 out vec4 frag_color;
 
-#include "common/lights.glsl"
+#include "common/scene_data.glsl"
+#include "common/camera.glsl"
 #include "common/fog.glsl"
 
 uniform sampler2D u_grass_texture;
 uniform vec3 u_base_color;
 uniform vec3 u_tip_color;
-uniform vec3 u_view_pos; // Needed for fog
+// uniform vec3 u_view_pos; // In CameraData
 
 void main() {
     // Sample grass texture
@@ -37,12 +38,12 @@ void main() {
     
     // Simple lighting (grass has upward-facing normal)
     vec3 N = vec3(0.0, 1.0, 0.0);
-    vec3 L = normalize(-u_sun.direction);
+    vec3 L = normalize(-u_sun.direction.xyz);
     float NdotL = max(dot(N, L), 0.0);
     
     // Combine lighting
-    vec3 diffuse = u_sun.color * u_sun.intensity * NdotL * 0.8;
-    vec3 ambient = u_ambient_light * 0.6;
+    vec3 diffuse = u_sun.color.xyz * u_sun.intensity.x * NdotL * 0.8;
+    vec3 ambient = u_ambient_light.xyz * 0.6;
     
     vec3 final_color = grass_color * (diffuse + ambient);
     

@@ -1,26 +1,25 @@
 #ifndef LIGHTS_GLSL
 #define LIGHTS_GLSL
 
+// std140 layout compatible structs (must match C++ side)
+// vec3 has 16-byte alignment but 12-byte size in std140, which causes
+// offset mismatches. Using vec4 ensures proper alignment.
+
 struct DirectionalLight {
-    vec3 direction;
-    vec3 color;
-    float intensity;
-};
+    vec4 direction; // xyz = direction, w = padding
+    vec4 color;     // xyz = color, w = padding
+    vec4 intensity; // x = intensity, yzw = padding
+}; // Total: 48 bytes
 
 #define MAX_POINT_LIGHTS 16
 struct PointLight {
-    vec3 position;
-    vec3 color;
+    vec4 position;  // xyz = position, w = padding
+    vec4 color;     // xyz = color, w = padding
     float intensity;
     float range;
-};
+    float _pad[2];  // explicit padding to 48 bytes
+}; // Total: 48 bytes
 
-// Uniforms expected by shaders using lights
-// Note: Uniforms cannot be in a block easily without UBOs, 
-// so we assume standard naming conventions here.
-uniform DirectionalLight u_sun;
-uniform vec3 u_ambient_light;
-uniform int u_point_light_count;
-uniform PointLight u_point_lights[MAX_POINT_LIGHTS];
+// Uniforms are now provided via SceneData UBO in common/scene_data.glsl
 
 #endif

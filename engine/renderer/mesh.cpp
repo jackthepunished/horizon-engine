@@ -83,10 +83,17 @@ Mesh Mesh::create_plane(f32 size, i32 subdivisions) {
             f32 pz = -half_size + static_cast<f32>(z) * step;
 
             // Tangent is along X axis for a horizontal plane
-            vertices.push_back({.position = {px, 0.0f, pz},
-                                .normal = {0.0f, 1.0f, 0.0f},
-                                .texcoord = {static_cast<f32>(x), static_cast<f32>(z)},
-                                .tangent = {1.0f, 0.0f, 0.0f}});
+            Vertex v;
+            v.position = {px, 0.0f, pz};
+            v.normal = {0.0f, 1.0f, 0.0f};
+            v.texcoord = {static_cast<f32>(x), static_cast<f32>(z)};
+            v.tangent = {1.0f, 0.0f, 0.0f};
+            // Explicitly init bone data
+            for (int k = 0; k < 4; k++) {
+                v.bone_ids[k] = -1;
+                v.bone_weights[k] = 0.0f;
+            }
+            vertices.push_back(v);
         }
     }
 
@@ -116,38 +123,57 @@ Mesh Mesh::create_plane(f32 size, i32 subdivisions) {
 Mesh Mesh::create_cube(f32 size) {
     f32 h = size / 2.0f;
 
-    std::vector<Vertex> vertices = {
-        // Front face - tangent along +X
-        {{-h, -h, h}, {0, 0, 1}, {0, 0}, {1, 0, 0}},
-        {{h, -h, h}, {0, 0, 1}, {1, 0}, {1, 0, 0}},
-        {{h, h, h}, {0, 0, 1}, {1, 1}, {1, 0, 0}},
-        {{-h, h, h}, {0, 0, 1}, {0, 1}, {1, 0, 0}},
-        // Back face - tangent along -X
-        {{h, -h, -h}, {0, 0, -1}, {0, 0}, {-1, 0, 0}},
-        {{-h, -h, -h}, {0, 0, -1}, {1, 0}, {-1, 0, 0}},
-        {{-h, h, -h}, {0, 0, -1}, {1, 1}, {-1, 0, 0}},
-        {{h, h, -h}, {0, 0, -1}, {0, 1}, {-1, 0, 0}},
-        // Top face - tangent along +X
-        {{-h, h, h}, {0, 1, 0}, {0, 0}, {1, 0, 0}},
-        {{h, h, h}, {0, 1, 0}, {1, 0}, {1, 0, 0}},
-        {{h, h, -h}, {0, 1, 0}, {1, 1}, {1, 0, 0}},
-        {{-h, h, -h}, {0, 1, 0}, {0, 1}, {1, 0, 0}},
-        // Bottom face - tangent along +X
-        {{-h, -h, -h}, {0, -1, 0}, {0, 0}, {1, 0, 0}},
-        {{h, -h, -h}, {0, -1, 0}, {1, 0}, {1, 0, 0}},
-        {{h, -h, h}, {0, -1, 0}, {1, 1}, {1, 0, 0}},
-        {{-h, -h, h}, {0, -1, 0}, {0, 1}, {1, 0, 0}},
-        // Right face - tangent along -Z
-        {{h, -h, h}, {1, 0, 0}, {0, 0}, {0, 0, -1}},
-        {{h, -h, -h}, {1, 0, 0}, {1, 0}, {0, 0, -1}},
-        {{h, h, -h}, {1, 0, 0}, {1, 1}, {0, 0, -1}},
-        {{h, h, h}, {1, 0, 0}, {0, 1}, {0, 0, -1}},
-        // Left face - tangent along +Z
-        {{-h, -h, -h}, {-1, 0, 0}, {0, 0}, {0, 0, 1}},
-        {{-h, -h, h}, {-1, 0, 0}, {1, 0}, {0, 0, 1}},
-        {{-h, h, h}, {-1, 0, 0}, {1, 1}, {0, 0, 1}},
-        {{-h, h, -h}, {-1, 0, 0}, {0, 1}, {0, 0, 1}},
+    std::vector<Vertex> vertices;
+    vertices.reserve(24);
+
+    auto add_vertex = [&](glm::vec3 p, glm::vec3 n, glm::vec2 uv, glm::vec3 t) {
+        Vertex v;
+        v.position = p;
+        v.normal = n;
+        v.texcoord = uv;
+        v.tangent = t;
+        for (int k = 0; k < 4; k++) {
+            v.bone_ids[k] = -1;
+            v.bone_weights[k] = 0.0f;
+        }
+        vertices.push_back(v);
     };
+
+    // Front face - tangent along +X
+    add_vertex({-h, -h, h}, {0, 0, 1}, {0, 0}, {1, 0, 0});
+    add_vertex({h, -h, h}, {0, 0, 1}, {1, 0}, {1, 0, 0});
+    add_vertex({h, h, h}, {0, 0, 1}, {1, 1}, {1, 0, 0});
+    add_vertex({-h, h, h}, {0, 0, 1}, {0, 1}, {1, 0, 0});
+
+    // Back face - tangent along -X
+    add_vertex({h, -h, -h}, {0, 0, -1}, {0, 0}, {-1, 0, 0});
+    add_vertex({-h, -h, -h}, {0, 0, -1}, {1, 0}, {-1, 0, 0});
+    add_vertex({-h, h, -h}, {0, 0, -1}, {1, 1}, {-1, 0, 0});
+    add_vertex({h, h, -h}, {0, 0, -1}, {0, 1}, {-1, 0, 0});
+
+    // Top face - tangent along +X
+    add_vertex({-h, h, h}, {0, 1, 0}, {0, 0}, {1, 0, 0});
+    add_vertex({h, h, h}, {0, 1, 0}, {1, 0}, {1, 0, 0});
+    add_vertex({h, h, -h}, {0, 1, 0}, {1, 1}, {1, 0, 0});
+    add_vertex({-h, h, -h}, {0, 1, 0}, {0, 1}, {1, 0, 0});
+
+    // Bottom face - tangent along +X
+    add_vertex({-h, -h, -h}, {0, -1, 0}, {0, 0}, {1, 0, 0});
+    add_vertex({h, -h, -h}, {0, -1, 0}, {1, 0}, {1, 0, 0});
+    add_vertex({h, -h, h}, {0, -1, 0}, {1, 1}, {1, 0, 0});
+    add_vertex({-h, -h, h}, {0, -1, 0}, {0, 1}, {1, 0, 0});
+
+    // Right face - tangent along -Z
+    add_vertex({h, -h, h}, {1, 0, 0}, {0, 0}, {0, 0, -1});
+    add_vertex({h, -h, -h}, {1, 0, 0}, {1, 0}, {0, 0, -1});
+    add_vertex({h, h, -h}, {1, 0, 0}, {1, 1}, {0, 0, -1});
+    add_vertex({h, h, h}, {1, 0, 0}, {0, 1}, {0, 0, -1});
+
+    // Left face - tangent along +Z
+    add_vertex({-h, -h, -h}, {-1, 0, 0}, {0, 0}, {0, 0, 1});
+    add_vertex({-h, -h, h}, {-1, 0, 0}, {1, 0}, {0, 0, 1});
+    add_vertex({-h, h, h}, {-1, 0, 0}, {1, 1}, {0, 0, 1});
+    add_vertex({-h, h, -h}, {-1, 0, 0}, {0, 1}, {0, 0, 1});
 
     std::vector<u32> indices;
     for (u32 face = 0; face < 6; ++face) {

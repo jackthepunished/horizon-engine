@@ -49,9 +49,13 @@ set(ENGINE_SOURCES
     renderer/ibl.cpp
     renderer/terrain.cpp
     renderer/grass.cpp
+    renderer/water.cpp
+    renderer/particle_system.cpp
     renderer/opengl/buffer.cpp
     renderer/opengl/framebuffer.cpp
+    renderer/opengl/framebuffer.cpp
     renderer/opengl/shader.cpp
+    renderer/opengl/uniform_buffer.cpp
 
     # Audio
     audio/audio_engine.cpp
@@ -105,9 +109,13 @@ set(ENGINE_HEADERS
     renderer/ibl.hpp
     renderer/terrain.hpp
     renderer/grass.hpp
+    renderer/water.hpp
+    renderer/particle_system.hpp
     renderer/opengl/gl_context.hpp
     renderer/opengl/shader.hpp
+    renderer/opengl/shader.hpp
     renderer/opengl/buffer.hpp
+    renderer/opengl/uniform_buffer.hpp
 
     # GLAD
     vendor/glad/glad.h

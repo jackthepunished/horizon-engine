@@ -145,6 +145,25 @@ GLAPI int gladLoadGLLoader(void* (*load)(const char* name));
 #define GL_DEPTH_COMPONENT32F 0x8CAC
 #define GL_DEPTH24_STENCIL8 0x88F0
 
+/* UBO Constants */
+#define GL_UNIFORM_BUFFER 0x8A11
+#define GL_UNIFORM_BUFFER_BINDING 0x8A28
+#define GL_UNIFORM_BUFFER_START 0x8A29
+#define GL_UNIFORM_BUFFER_SIZE 0x8A2A
+#define GL_MAX_UNIFORM_BUFFER_BINDINGS 0x8A2F
+#define GL_MAX_UNIFORM_BLOCK_SIZE 0x8A30
+#define GL_MAX_VERTEX_UNIFORM_BLOCKS 0x8A2B
+#define GL_MAX_GEOMETRY_UNIFORM_BLOCKS 0x8A2C
+#define GL_MAX_FRAGMENT_UNIFORM_BLOCKS 0x8A2D
+#define GL_UNIFORM_BLOCK_DATA_SIZE 0x8A40
+#define GL_UNIFORM_BLOCK_NAME_LENGTH 0x8A41
+#define GL_UNIFORM_BLOCK_ACTIVE_UNIFORMS 0x8A42
+#define GL_UNIFORM_BLOCK_ACTIVE_UNIFORM_INDICES 0x8A43
+#define GL_UNIFORM_BLOCK_REFERENCED_BY_VERTEX_SHADER 0x8A44
+#define GL_UNIFORM_BLOCK_REFERENCED_BY_GEOMETRY_SHADER 0x8A45
+#define GL_UNIFORM_BLOCK_REFERENCED_BY_FRAGMENT_SHADER 0x8A46
+#define GL_INVALID_INDEX 0xFFFFFFFFu
+
 /* Shaders */
 #define GL_VERTEX_SHADER 0x8B31
 #define GL_FRAGMENT_SHADER 0x8B30
@@ -288,6 +307,14 @@ GLAPI void(GLAPIENTRY* glBufferData)(GLenum target, GLsizeiptr size, const void*
 GLAPI void(GLAPIENTRY* glBufferSubData)(GLenum target, GLintptr offset, GLsizeiptr size,
                                         const void* data);
 
+/* Function pointers */
+GLAPI void(GLAPIENTRY* glBindBufferBase)(GLenum target, GLuint index, GLuint buffer);
+GLAPI void(GLAPIENTRY* glBindBufferRange)(GLenum target, GLuint index, GLuint buffer,
+                                          GLintptr offset, GLsizeiptr size);
+GLAPI GLuint(GLAPIENTRY* glGetUniformBlockIndex)(GLuint program, const GLchar* uniformBlockName);
+GLAPI void(GLAPIENTRY* glUniformBlockBinding)(GLuint program, GLuint uniformBlockIndex,
+                                              GLuint uniformBlockBinding);
+
 /* Vertex Arrays */
 GLAPI void(GLAPIENTRY* glGenVertexArrays)(GLsizei n, GLuint* arrays);
 GLAPI void(GLAPIENTRY* glDeleteVertexArrays)(GLsizei n, const GLuint* arrays);
@@ -297,6 +324,8 @@ GLAPI void(GLAPIENTRY* glDisableVertexAttribArray)(GLuint index);
 GLAPI void(GLAPIENTRY* glVertexAttribPointer)(GLuint index, GLint size, GLenum type,
                                               GLboolean normalized, GLsizei stride,
                                               const void* pointer);
+GLAPI void(GLAPIENTRY* glVertexAttribIPointer)(GLuint index, GLint size, GLenum type,
+                                               GLsizei stride, const void* pointer);
 
 /* Drawing */
 GLAPI void(GLAPIENTRY* glDrawArrays)(GLenum mode, GLint first, GLsizei count);

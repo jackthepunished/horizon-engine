@@ -37,13 +37,9 @@ uniform float u_ao;
 uniform float u_uv_scale;
 uniform bool u_use_textures;
 
-// Camera
-uniform vec3 u_cam_pos;
-uniform vec3 u_view_pos;
-uniform vec2 u_viewport_size;
-
-// Lights
-#include "common/lights.glsl"
+// Camera & Scene Data
+#include "common/camera.glsl"
+#include "common/scene_data.glsl"
 
 // Math & PBR
 #include "common/math.glsl"
@@ -130,9 +126,8 @@ void main() {
         N = normalize(v_TBN[2]);
     }
     
-    // View direction - use whichever uniform is set
-    vec3 cam_pos = length(u_cam_pos) > 0.0 ? u_cam_pos : u_view_pos;
-    vec3 V = normalize(cam_pos - v_world_pos);
+    // View direction - use u_view_pos from CameraData
+    vec3 V = normalize(u_view_pos - v_world_pos);
     vec3 R = reflect(-V, N);
     
     // Fresnel reflectance at normal incidence
@@ -142,18 +137,18 @@ void main() {
     vec3 Lo = vec3(0.0);
     
     // Sun (Directional Light)
-    vec3 L_sun = normalize(-u_sun.direction);
-    vec3 sun_radiance = u_sun.color * u_sun.intensity;
+    vec3 L_sun = normalize(-u_sun.direction.xyz);
+    vec3 sun_radiance = u_sun.color.xyz * u_sun.intensity.x;
     float shadow = calculate_shadow(v_frag_pos_light_space, N, L_sun);
     Lo += (1.0 - shadow) * calculate_light(L_sun, sun_radiance, N, V, albedo, metallic, roughness, F0);
     
     // Point lights
     for (int i = 0; i < u_point_light_count; ++i) {
-        vec3 L = normalize(u_point_lights[i].position - v_world_pos);
-        float distance = length(u_point_lights[i].position - v_world_pos);
+        vec3 L = normalize(u_point_lights[i].position.xyz - v_world_pos);
+        float distance = length(u_point_lights[i].position.xyz - v_world_pos);
         float attenuation = clamp(1.0 - (distance / u_point_lights[i].range), 0.0, 1.0);
         attenuation *= attenuation;
-        vec3 radiance = u_point_lights[i].color * u_point_lights[i].intensity * attenuation;
+        vec3 radiance = u_point_lights[i].color.xyz * u_point_lights[i].intensity * attenuation;
         Lo += calculate_light(L, radiance, N, V, albedo, metallic, roughness, F0);
     }
     
@@ -180,7 +175,7 @@ void main() {
         ambient = (kD * diffuse + specular) * ao;
     } else {
         // Simple ambient fallback
-        ambient = u_ambient_light * albedo * ao;
+        ambient = u_ambient_light.xyz * albedo * ao;
     }
     
     // SSAO

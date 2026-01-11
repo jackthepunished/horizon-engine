@@ -5,8 +5,9 @@ layout(location = 1) in vec3 a_normal;
 layout(location = 2) in vec2 a_texcoord;    // Tiled UV for detail textures
 layout(location = 3) in vec2 a_splatcoord;  // 0-1 UV for splatmap
 
+#include "common/camera.glsl"
+
 uniform mat4 u_model;
-uniform mat4 u_view_projection;
 uniform mat4 u_light_space_matrix;
 
 out vec3 v_world_pos;

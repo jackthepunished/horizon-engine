@@ -5,13 +5,14 @@ layout(location = 1) in vec3 a_normal;
 layout(location = 2) in vec2 a_texcoord;
 layout(location = 3) in vec3 a_tangent;
 
-layout(location = 4) in vec4 a_bone_ids;
+layout(location = 4) in ivec4 a_bone_ids;
 layout(location = 5) in vec4 a_weights;
 
 layout(location = 6) in mat4 a_instance_matrix; // Occupies 6, 7, 8, 9
 
+#include "common/camera.glsl"
+
 uniform mat4 u_model;
-uniform mat4 u_view_projection;
 uniform mat4 u_light_space_matrix;
 uniform bool u_instanced;
 
@@ -33,7 +34,7 @@ void main() {
     // Apply skinning if active
     if (u_has_animations) {
         for(int i = 0 ; i < MAX_BONE_INFLUENCE ; i++) {
-            int bone_id = int(a_bone_ids[i]);
+            int bone_id = a_bone_ids[i];
             if(bone_id == -1) 
                 continue;
             
