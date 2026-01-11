@@ -25,6 +25,9 @@ Strictly keeping up with learnopengl.com
 ### Rendering
 
 - **OpenGL 4.1 PBR Renderer** - Cross-platform graphics (macOS, Windows, Linux)
+- **Shader Preprocessor** - Runtime `#include` support for modular GLSL
+- **Common GLSL Library** - Reusable lighting and math functions
+- **Vegetation Rendering** - 3D grass with wind animation and billboarding
 - **Material System** - First-class PBR materials with texture handles
 - **GLTF Model Loading** - Full 3D model support via tinygltf
 - **HDR Pipeline** - Bloom, tone mapping, exposure control

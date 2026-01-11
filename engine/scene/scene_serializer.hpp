@@ -1,6 +1,6 @@
 #pragma once
 
-#include "engine/ecs/world.hpp"
+#include "engine/scene/scene.hpp"
 
 #include <filesystem>
 #include <string>
@@ -9,20 +9,20 @@ namespace hz {
 
 class SceneSerializer {
 public:
-    explicit SceneSerializer(World& world);
+    explicit SceneSerializer(Scene& scene);
 
     /**
-     * @brief Serialize the current world to a file
+     * @brief Serialize the current scene to a file
      */
     void serialize(const std::filesystem::path& path);
 
     /**
-     * @brief Deserialize a world from a file (clears current world)
+     * @brief Deserialize a scene from a file (clears current scene)
      */
     bool deserialize(const std::filesystem::path& path);
 
 private:
-    World& m_world;
+    Scene& m_scene;
 };
 
 } // namespace hz

@@ -6,8 +6,8 @@
  */
 
 #include "engine/core/log.hpp"
-#include "engine/ecs/world.hpp"
 #include "engine/scene/components.hpp"
+#include "engine/scene/scene.hpp"
 #include "scene_settings.hpp"
 
 #include <string>
@@ -27,12 +27,12 @@ public:
 
     /**
      * @brief Draw the editor UI
-     * @param world The ECS world to edit
+     * @param scene The Scene to edit
      * @param settings Scene settings to edit
      * @param fps Current FPS
      * @param entity_count Total entity count
      */
-    void draw(hz::World& world, SceneSettings& settings, float fps, size_t entity_count);
+    void draw(hz::Scene& scene, SceneSettings& settings, float fps, size_t entity_count);
 
     /**
      * @brief Add a log message to the console
@@ -47,18 +47,36 @@ public:
     /**
      * @brief Check if an entity is selected
      */
-    [[nodiscard]] bool has_selection() const {
-        return m_selected_entity.index != hz::Entity::INVALID_INDEX;
-    }
+    [[nodiscard]] bool has_selection() const { return m_selected_entity != hz::Entity{entt::null}; }
 
     /**
      * @brief Get the selected entity
      */
     [[nodiscard]] hz::Entity selected_entity() const { return m_selected_entity; }
 
+    /**
+     * @brief Check if "Add Cube" was clicked
+     */
+    [[nodiscard]] bool should_add_cube() {
+        bool result = m_add_cube_requested;
+        m_add_cube_requested = false;
+        return result;
+    }
+
+    /**
+     * @brief Check if "Add Light" was clicked
+     */
+    [[nodiscard]] bool should_add_light() {
+        bool result = m_add_light_requested;
+        m_add_light_requested = false;
+        return result;
+    }
+
 private:
-    void draw_hierarchy(hz::World& world, float display_h, float menu_bar_height, float width);
-    void draw_inspector(hz::World& world, float display_w, float display_h, float menu_bar_height,
+    bool m_add_cube_requested{false};
+    bool m_add_light_requested{false};
+    void draw_hierarchy(hz::Scene& scene, float display_h, float menu_bar_height, float width);
+    void draw_inspector(hz::Scene& scene, float display_w, float display_h, float menu_bar_height,
                         float width);
     void draw_scene_settings(SceneSettings& settings, float display_w, float display_h,
                              float menu_bar_height, float width);
@@ -66,7 +84,7 @@ private:
     void draw_toolbar(float display_w, float menu_bar_height);
     void draw_console(float display_h, float menu_bar_height, float width);
 
-    hz::Entity m_selected_entity{hz::Entity::INVALID_INDEX, 0};
+    hz::Entity m_selected_entity{entt::null};
 
     // Panel Visibility
     bool m_show_hierarchy{true};

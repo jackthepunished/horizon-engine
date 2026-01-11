@@ -51,6 +51,13 @@ void(GLAPIENTRY* glDrawArrays)(GLenum mode, GLint first, GLsizei count) = NULL;
 void(GLAPIENTRY* glDrawElements)(GLenum mode, GLsizei count, GLenum type,
                                  const void* indices) = NULL;
 
+/* Instanced Rendering */
+void(GLAPIENTRY* glDrawArraysInstanced)(GLenum mode, GLint first, GLsizei count,
+                                        GLsizei instancecount) = NULL;
+void(GLAPIENTRY* glDrawElementsInstanced)(GLenum mode, GLsizei count, GLenum type,
+                                          const void* indices, GLsizei instancecount) = NULL;
+void(GLAPIENTRY* glVertexAttribDivisor)(GLuint index, GLuint divisor) = NULL;
+
 GLuint(GLAPIENTRY* glCreateShader)(GLenum type) = NULL;
 void(GLAPIENTRY* glDeleteShader)(GLuint shader) = NULL;
 void(GLAPIENTRY* glShaderSource)(GLuint shader, GLsizei count, const GLchar* const* string,
@@ -146,6 +153,13 @@ static void load_GL_version_4_1(GLloadproc load) {
     glDrawArrays = (void(GLAPIENTRY*)(GLenum, GLint, GLsizei))load("glDrawArrays");
     glDrawElements =
         (void(GLAPIENTRY*)(GLenum, GLsizei, GLenum, const void*))load("glDrawElements");
+
+    /* Instanced Rendering */
+    glDrawArraysInstanced =
+        (void(GLAPIENTRY*)(GLenum, GLint, GLsizei, GLsizei))load("glDrawArraysInstanced");
+    glDrawElementsInstanced = (void(GLAPIENTRY*)(GLenum, GLsizei, GLenum, const void*,
+                                                 GLsizei))load("glDrawElementsInstanced");
+    glVertexAttribDivisor = (void(GLAPIENTRY*)(GLuint, GLuint))load("glVertexAttribDivisor");
 
     glCreateShader = (GLuint(GLAPIENTRY*)(GLenum))load("glCreateShader");
     glDeleteShader = (void(GLAPIENTRY*)(GLuint))load("glDeleteShader");

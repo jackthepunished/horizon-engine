@@ -77,6 +77,11 @@ set(USE_STATIC_MSVC_RUNTIME_LIBRARY OFF CACHE BOOL "" FORCE)
 set(ENABLE_ALL_WARNINGS OFF CACHE BOOL "" FORCE)
 set(INTERPROCEDURAL_OPTIMIZATION OFF CACHE BOOL "" FORCE)
 
+# Suppress CMake warning about install() path normalization
+if(POLICY CMP0177)
+    set(CMAKE_POLICY_DEFAULT_CMP0177 NEW)
+endif()
+
 FetchContent_Declare(
     JoltPhysics
     GIT_REPOSITORY https://github.com/jrouwe/JoltPhysics.git
@@ -108,6 +113,17 @@ FetchContent_Declare(
 )
 
 # ============================================================================
+# EnTT - Entity Component System (header-only)
+# ============================================================================
+
+FetchContent_Declare(
+    entt
+    GIT_REPOSITORY https://github.com/skypjack/entt.git
+    GIT_TAG v3.13.0
+    GIT_SHALLOW TRUE
+)
+
+# ============================================================================
 # Catch2 - Testing (only if tests enabled)
 # ============================================================================
 
@@ -125,7 +141,21 @@ endif()
 # Make All Available
 # ============================================================================
 
-FetchContent_MakeAvailable(glfw glm spdlog stb tinyobjloader JoltPhysics imgui miniaudio)
+FetchContent_MakeAvailable(glfw spdlog stb tinyobjloader JoltPhysics imgui miniaudio entt)
+
+# Manually setup GLM to avoid its deprecated CMakeLists.txt
+FetchContent_GetProperties(glm)
+if(NOT glm_POPULATED)
+    if(POLICY CMP0169)
+        cmake_policy(SET CMP0169 OLD)
+    endif()
+    FetchContent_Populate(glm)
+    if(POLICY CMP0169)
+        cmake_policy(SET CMP0169 NEW)
+    endif()
+    add_library(glm INTERFACE)
+    target_include_directories(glm SYSTEM INTERFACE ${glm_SOURCE_DIR})
+endif()
 
 # Create interface libraries for header-only deps
 add_library(stb INTERFACE)

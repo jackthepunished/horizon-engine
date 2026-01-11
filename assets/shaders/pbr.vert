@@ -8,9 +8,12 @@ layout(location = 3) in vec3 a_tangent;
 layout(location = 4) in vec4 a_bone_ids;
 layout(location = 5) in vec4 a_weights;
 
+layout(location = 6) in mat4 a_instance_matrix; // Occupies 6, 7, 8, 9
+
 uniform mat4 u_model;
 uniform mat4 u_view_projection;
 uniform mat4 u_light_space_matrix;
+uniform bool u_instanced;
 
 const int MAX_BONES = 100;
 const int MAX_BONE_INFLUENCE = 4;
@@ -47,7 +50,7 @@ void main() {
             total_tangent += (normal_mat * a_tangent) * a_weights[i];
         }
         
-        // Safety check if weights sum to 0 (should imply no bones, but handle gracefully)
+        // Safety check if weights sum to 0
         if (length(total_normal) < 0.001) {
              total_pos = vec4(a_position, 1.0);
              total_normal = a_normal;
@@ -59,12 +62,13 @@ void main() {
         total_tangent = a_tangent;
     }
 
-    vec4 world_pos = u_model * total_pos;
+    mat4 model_matrix = u_instanced ? a_instance_matrix : u_model;
+    vec4 world_pos = model_matrix * total_pos;
     v_world_pos = vec3(world_pos);
     v_texcoord = a_texcoord;
     
     // Compute TBN matrix for normal mapping
-    mat3 normal_matrix = mat3(transpose(inverse(u_model)));
+    mat3 normal_matrix = mat3(transpose(inverse(model_matrix)));
     vec3 T = normalize(normal_matrix * total_tangent);
     vec3 N = normalize(normal_matrix * total_normal);
     T = normalize(T - dot(T, N) * N); // Gram-Schmidt

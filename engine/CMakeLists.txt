@@ -2,6 +2,7 @@
 FetchContent_Declare(
     json
     URL https://github.com/nlohmann/json/releases/download/v3.11.3/json.tar.xz
+    DOWNLOAD_EXTRACT_TIMESTAMP TRUE
 )
 FetchContent_MakeAvailable(json)
 
@@ -19,11 +20,12 @@ set(ENGINE_SOURCES
     platform/window.cpp
     platform/input.cpp
 
-    # ECS
-    ecs/entity_manager.cpp
-    ecs/world.cpp
+    # ECS (Deprecated - To be removed)
+    # ecs/entity_manager.cpp
+    # ecs/world.cpp
 
     # Scene
+    scene/scene.cpp
     scene/components.cpp
     scene/scene_serializer.cpp
 
@@ -45,6 +47,8 @@ set(ENGINE_SOURCES
     renderer/camera.cpp
     renderer/mesh.cpp
     renderer/ibl.cpp
+    renderer/terrain.cpp
+    renderer/grass.cpp
     renderer/opengl/buffer.cpp
     renderer/opengl/framebuffer.cpp
     renderer/opengl/shader.cpp
@@ -72,10 +76,14 @@ set(ENGINE_HEADERS
     platform/input.hpp
 
     # ECS
-    ecs/entity.hpp
-    ecs/component_storage.hpp
-    ecs/system.hpp
-    ecs/world.hpp
+    # ECS (Deprecated)
+    # ecs/entity.hpp
+    # ecs/component_storage.hpp
+    # ecs/system.hpp
+    # ecs/world.hpp
+    
+    # Scene
+    scene/scene.hpp
 
     # Assets
     assets/asset_handle.hpp
@@ -95,6 +103,8 @@ set(ENGINE_HEADERS
     renderer/camera.hpp
     renderer/mesh.hpp
     renderer/ibl.hpp
+    renderer/terrain.hpp
+    renderer/grass.hpp
     renderer/opengl/gl_context.hpp
     renderer/opengl/shader.hpp
     renderer/opengl/buffer.hpp
@@ -114,6 +124,7 @@ target_include_directories(horizon_engine
 
 target_link_libraries(horizon_engine
     PUBLIC
+        EnTT::EnTT
         glfw
         glm
         spdlog::spdlog

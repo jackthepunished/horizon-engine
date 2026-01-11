@@ -303,6 +303,13 @@ GLAPI void(GLAPIENTRY* glDrawArrays)(GLenum mode, GLint first, GLsizei count);
 GLAPI void(GLAPIENTRY* glDrawElements)(GLenum mode, GLsizei count, GLenum type,
                                        const void* indices);
 
+/* Instanced Rendering (OpenGL 3.1+) */
+GLAPI void(GLAPIENTRY* glDrawArraysInstanced)(GLenum mode, GLint first, GLsizei count,
+                                              GLsizei instancecount);
+GLAPI void(GLAPIENTRY* glDrawElementsInstanced)(GLenum mode, GLsizei count, GLenum type,
+                                                const void* indices, GLsizei instancecount);
+GLAPI void(GLAPIENTRY* glVertexAttribDivisor)(GLuint index, GLuint divisor);
+
 /* Shaders */
 GLAPI GLuint(GLAPIENTRY* glCreateShader)(GLenum type);
 GLAPI void(GLAPIENTRY* glDeleteShader)(GLuint shader);

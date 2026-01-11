@@ -4,7 +4,7 @@
 
 namespace game {
 
-void EditorUI::draw(hz::World& world, SceneSettings& settings, float fps, size_t entity_count) {
+void EditorUI::draw(hz::Scene& scene, SceneSettings& settings, float fps, size_t entity_count) {
     // Get viewport size for positioning
     ImGuiIO& io = ImGui::GetIO();
     float display_w = io.DisplaySize.x;
@@ -52,11 +52,11 @@ void EditorUI::draw(hz::World& world, SceneSettings& settings, float fps, size_t
     float top_offset = menu_bar_height + (m_show_toolbar ? 40.0f : 0.0f);
 
     if (m_show_hierarchy) {
-        draw_hierarchy(world, display_h, top_offset, hierarchy_width);
+        draw_hierarchy(scene, display_h, top_offset, hierarchy_width);
     }
 
     if (m_show_inspector) {
-        draw_inspector(world, display_w, display_h, top_offset, inspector_width);
+        draw_inspector(scene, display_w, display_h, top_offset, inspector_width);
     }
 
     if (m_show_settings) {
@@ -90,17 +90,19 @@ void EditorUI::draw_toolbar(float display_w, float menu_bar_height) {
         ImGui::SameLine();
         ImGui::Separator();
         ImGui::SameLine();
-        if (ImGui::Button("Add Cube")) { /* Handler in main loop ideally */
+        if (ImGui::Button("Add Cube")) {
+            m_add_cube_requested = true;
         }
         ImGui::SameLine();
-        if (ImGui::Button("Add Light")) { /* Handler in main loop ideally */
+        if (ImGui::Button("Add Light")) {
+            m_add_light_requested = true;
         }
     }
     ImGui::End();
     ImGui::PopStyleColor();
 }
 
-void EditorUI::draw_hierarchy(hz::World& world, float display_h, float top_offset, float width) {
+void EditorUI::draw_hierarchy(hz::Scene& scene, float display_h, float top_offset, float width) {
     ImGui::SetNextWindowPos(ImVec2(0, top_offset), ImGuiCond_Always);
     ImGui::SetNextWindowSize(ImVec2(width, display_h - top_offset), ImGuiCond_Always);
 
@@ -108,22 +110,24 @@ void EditorUI::draw_hierarchy(hz::World& world, float display_h, float top_offse
         ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoCollapse;
 
     if (ImGui::Begin("Hierarchy", &m_show_hierarchy, flags)) {
-        world.each_entity([&](hz::Entity entity) {
-            std::string name = "Entity " + std::to_string(entity.index);
-            if (auto* tag = world.get_component<hz::TagComponent>(entity)) {
+        // iterate all entities
+        auto view = scene.registry().view<hz::Entity>();
+        view.each([&](auto entity) {
+            std::string name = "Entity " + std::to_string(static_cast<uint32_t>(entity));
+            if (auto* tag = scene.registry().try_get<hz::TagComponent>(entity)) {
                 name = tag->tag;
             }
 
-            bool is_selected = (m_selected_entity.index == entity.index);
+            bool is_selected = (m_selected_entity == entity);
             if (ImGui::Selectable(name.c_str(), is_selected)) {
                 m_selected_entity = entity;
             }
 
             if (ImGui::BeginPopupContextItem()) {
                 if (ImGui::MenuItem("Delete")) {
-                    world.destroy_entity(entity);
-                    if (m_selected_entity.index == entity.index) {
-                        m_selected_entity = {hz::Entity::INVALID_INDEX, 0};
+                    scene.destroy_entity(entity);
+                    if (m_selected_entity == entity) {
+                        m_selected_entity = entt::null;
                     }
                 }
                 ImGui::EndPopup();
@@ -133,16 +137,16 @@ void EditorUI::draw_hierarchy(hz::World& world, float display_h, float top_offse
         ImGui::Separator();
 
         if (ImGui::Button("+ Add Entity", ImVec2(-1, 0))) {
-            auto new_entity = world.create_entity();
-            world.add_component<hz::TagComponent>(new_entity, "New Entity");
-            world.add_component<hz::TransformComponent>(new_entity);
+            auto new_entity = scene.create_entity();
+            scene.registry().emplace<hz::TagComponent>(new_entity, "New Entity");
+            scene.registry().emplace<hz::TransformComponent>(new_entity);
             m_selected_entity = new_entity;
         }
     }
     ImGui::End();
 }
 
-void EditorUI::draw_inspector(hz::World& world, float display_w, float display_h, float top_offset,
+void EditorUI::draw_inspector(hz::Scene& scene, float display_w, float display_h, float top_offset,
                               float width) {
     ImGui::SetNextWindowPos(ImVec2(display_w - width, top_offset), ImGuiCond_Always);
     ImGui::SetNextWindowSize(ImVec2(width, display_h - top_offset), ImGuiCond_Always);
@@ -158,9 +162,14 @@ void EditorUI::draw_inspector(hz::World& world, float display_w, float display_h
         }
 
         hz::Entity entity = m_selected_entity;
+        if (!scene.registry().valid(entity)) {
+            m_selected_entity = entt::null;
+            ImGui::End();
+            return;
+        }
 
         // Tag Component
-        if (auto* tag = world.get_component<hz::TagComponent>(entity)) {
+        if (auto* tag = scene.registry().try_get<hz::TagComponent>(entity)) {
             if (ImGui::CollapsingHeader("Tag", ImGuiTreeNodeFlags_DefaultOpen)) {
                 char buffer[256];
                 strncpy(buffer, tag->tag.c_str(), sizeof(buffer) - 1);
@@ -172,7 +181,7 @@ void EditorUI::draw_inspector(hz::World& world, float display_w, float display_h
         }
 
         // Transform Component
-        if (auto* transform = world.get_component<hz::TransformComponent>(entity)) {
+        if (auto* transform = scene.registry().try_get<hz::TransformComponent>(entity)) {
             if (ImGui::CollapsingHeader("Transform", ImGuiTreeNodeFlags_DefaultOpen)) {
                 ImGui::DragFloat3("Position", &transform->position.x, 0.1f);
                 ImGui::DragFloat3("Rotation", &transform->rotation.x, 1.0f);
@@ -181,7 +190,7 @@ void EditorUI::draw_inspector(hz::World& world, float display_w, float display_h
         }
 
         // Mesh Component
-        if (auto* mesh = world.get_component<hz::MeshComponent>(entity)) {
+        if (auto* mesh = scene.registry().try_get<hz::MeshComponent>(entity)) {
             if (ImGui::CollapsingHeader("Mesh", ImGuiTreeNodeFlags_DefaultOpen)) {
                 ImGui::Text("Mesh: %s", mesh->mesh_path.c_str());
                 ImGui::Separator();
@@ -193,7 +202,7 @@ void EditorUI::draw_inspector(hz::World& world, float display_w, float display_h
         }
 
         // Light Component
-        if (auto* light = world.get_component<hz::LightComponent>(entity)) {
+        if (auto* light = scene.registry().try_get<hz::LightComponent>(entity)) {
             if (ImGui::CollapsingHeader("Light", ImGuiTreeNodeFlags_DefaultOpen)) {
                 ImGui::ColorEdit3("Color", &light->color.x);
                 ImGui::DragFloat("Intensity", &light->intensity, 0.1f, 0.0f, 100.0f);
@@ -208,14 +217,14 @@ void EditorUI::draw_inspector(hz::World& world, float display_w, float display_h
         }
 
         if (ImGui::BeginPopup("AddComponentPopup")) {
-            if (!world.get_component<hz::MeshComponent>(entity)) {
+            if (!scene.registry().try_get<hz::MeshComponent>(entity)) {
                 if (ImGui::MenuItem("Mesh Component")) {
-                    world.add_component<hz::MeshComponent>(entity);
+                    scene.registry().emplace<hz::MeshComponent>(entity);
                 }
             }
-            if (!world.get_component<hz::LightComponent>(entity)) {
+            if (!scene.registry().try_get<hz::LightComponent>(entity)) {
                 if (ImGui::MenuItem("Light Component")) {
-                    world.add_component<hz::LightComponent>(entity);
+                    scene.registry().emplace<hz::LightComponent>(entity);
                 }
             }
             ImGui::EndPopup();
@@ -230,6 +239,7 @@ void EditorUI::draw_stats(float fps, size_t entity_count, float display_w, float
         ImGui::Text("FPS: %.1f", fps);
         ImGui::Text("Entities: %zu", entity_count);
         ImGui::Text("Renderer: OpenGL");
+        ImGui::Text("Backend: EnTT");
     }
     ImGui::End();
 }
@@ -243,6 +253,14 @@ void EditorUI::draw_scene_settings(SceneSettings& settings, float display_w, flo
             ImGui::ColorEdit3("Clear Color", &settings.clear_color.x);
             ImGui::ColorEdit3("Ambient Color", &settings.ambient_color.x);
             ImGui::DragFloat("Ambient Intensity", &settings.ambient_intensity, 0.01f, 0.0f, 5.0f);
+
+            ImGui::Separator();
+            ImGui::Checkbox("Fog Enabled", &settings.fog_enabled);
+            if (settings.fog_enabled) {
+                ImGui::DragFloat("Fog Density", &settings.fog_density, 0.001f, 0.0f, 0.1f);
+                ImGui::ColorEdit3("Fog Color",
+                                  &settings.clear_color.x); // Fog usually matches clear color
+            }
         }
 
         if (ImGui::CollapsingHeader("Directional Light", ImGuiTreeNodeFlags_DefaultOpen)) {

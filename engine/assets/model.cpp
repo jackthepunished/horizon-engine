@@ -101,6 +101,18 @@ void Model::draw() const {
     }
 }
 
+void Model::setup_instancing(const std::vector<glm::mat4>& instance_transforms) {
+    for (auto& mesh : m_meshes) {
+        mesh.setup_instancing(instance_transforms);
+    }
+}
+
+void Model::draw_instanced(u32 instance_count) const {
+    for (const auto& mesh : m_meshes) {
+        mesh.draw_instanced(instance_count);
+    }
+}
+
 } // namespace hz
 
 // Re-open namespace for GLTF implementation

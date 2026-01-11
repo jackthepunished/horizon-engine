@@ -8,9 +8,12 @@
 #include "engine/core/types.hpp"
 #include "gl_context.hpp"
 
+#include <filesystem>
+#include <sstream>
 #include <string>
 #include <string_view>
 #include <unordered_map>
+#include <unordered_set>
 
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -75,6 +78,10 @@ private:
 
     GLuint m_program{0};
     mutable std::unordered_map<std::string, GLint> m_uniform_cache;
+
+    static bool process_shader_source(std::string_view source, std::stringstream& final_stream,
+                                      const std::filesystem::path& shader_dir,
+                                      std::unordered_set<std::string>& included_files);
 };
 
 } // namespace hz::gl

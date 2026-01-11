@@ -44,6 +44,16 @@ public:
     void draw() const;
 
     /**
+     * @brief Setup instancing for all meshes
+     */
+    void setup_instancing(const std::vector<glm::mat4>& instance_transforms);
+
+    /**
+     * @brief Draw all meshes instanced
+     */
+    void draw_instanced(u32 instance_count) const;
+
+    /**
      * @brief Check if model is valid
      */
     [[nodiscard]] bool is_valid() const noexcept { return !m_meshes.empty(); }

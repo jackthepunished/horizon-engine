@@ -213,4 +213,35 @@ Mesh Mesh::create_sphere(f32 radius, i32 slices, i32 stacks) {
     return Mesh(std::move(vertices), std::move(indices));
 }
 
+void Mesh::setup_instancing(const std::vector<glm::mat4>& instance_transforms) {
+    m_instance_count = static_cast<u32>(instance_transforms.size());
+    if (m_instance_count == 0)
+        return;
+
+    m_vao.bind();
+
+    // Upload instance data to VBO
+    // Reinterpreting cast to byte span for generic buffer upload if needed,
+    // but assuming set_data handles span<T> correctly by sizeof(T) * size()
+    m_instance_vbo.set_data(std::span<const glm::mat4>(instance_transforms));
+
+    // Matrix attributes (location 6, 7, 8, 9)
+    // A mat4 is 4 vec4s
+    std::size_t vec4_size = sizeof(glm::vec4);
+    for (int i = 0; i < 4; ++i) {
+        glEnableVertexAttribArray(6 + i);
+        glVertexAttribPointer(6 + i, 4, GL_FLOAT, GL_FALSE, sizeof(glm::mat4),
+                              (void*)(i * vec4_size));
+        glVertexAttribDivisor(6 + i, 1); // Tell OpenGL this is an instanced attribute
+    }
+
+    gl::VertexArray::unbind();
+}
+
+void Mesh::draw_instanced(u32 instance_count) const {
+    m_vao.bind();
+    glDrawElementsInstanced(GL_TRIANGLES, static_cast<GLsizei>(m_index_count), GL_UNSIGNED_INT,
+                            nullptr, static_cast<GLsizei>(instance_count));
+}
+
 } // namespace hz

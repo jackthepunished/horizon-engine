@@ -9,7 +9,6 @@ include(Catch)
 # Unit tests executable
 add_executable(horizon_tests
     unit/test_main.cpp
-    unit/test_ecs.cpp
     unit/test_memory.cpp
     unit/test_game_loop.cpp
 )

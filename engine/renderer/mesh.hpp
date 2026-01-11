@@ -86,11 +86,23 @@ public:
      */
     static Mesh create_sphere(f32 radius, i32 slices = 32, i32 stacks = 16);
 
+    /**
+     * @brief Setup instance buffer for instanced rendering
+     */
+    void setup_instancing(const std::vector<glm::mat4>& instance_transforms);
+
+    /**
+     * @brief Draw the mesh instanced
+     */
+    void draw_instanced(u32 instance_count) const;
+
 private:
     gl::VertexArray m_vao;
     gl::VertexBuffer m_vbo;
     gl::IndexBuffer m_ebo;
+    gl::VertexBuffer m_instance_vbo; // For instancing
     u32 m_index_count{0};
+    u32 m_instance_count{0};
 };
 
 } // namespace hz

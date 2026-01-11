@@ -12,30 +12,32 @@
 
 namespace hz {
 
-SceneSerializer::SceneSerializer(World& world) : m_world(world) {}
+SceneSerializer::SceneSerializer(Scene& scene) : m_scene(scene) {}
 
 void SceneSerializer::serialize(const std::filesystem::path& path) {
     nlohmann::json root;
     root["entities"] = nlohmann::json::array();
 
-    m_world.each_entity([&](Entity entity) {
+    auto view = m_scene.registry().view<hz::Entity>();
+    view.each([&](auto entity) {
         nlohmann::json entity_json;
-        entity_json["id"] = entity.index; // For debugging, not used in deserialize
+        entity_json["id"] = static_cast<uint32_t>(entity); // For debugging
 
-        // Serialize Components
-        if (auto* tc = m_world.get_component<TagComponent>(entity)) {
+        // Serialize Components (manual mapping for now)
+        // Check Tag
+        if (auto* tc = m_scene.registry().try_get<TagComponent>(entity)) {
             entity_json["TagComponent"] = *tc;
         }
 
-        if (auto* trc = m_world.get_component<TransformComponent>(entity)) {
+        if (auto* trc = m_scene.registry().try_get<TransformComponent>(entity)) {
             entity_json["TransformComponent"] = *trc;
         }
 
-        if (auto* mc = m_world.get_component<MeshComponent>(entity)) {
+        if (auto* mc = m_scene.registry().try_get<MeshComponent>(entity)) {
             entity_json["MeshComponent"] = *mc;
         }
 
-        if (auto* lc = m_world.get_component<LightComponent>(entity)) {
+        if (auto* lc = m_scene.registry().try_get<LightComponent>(entity)) {
             entity_json["LightComponent"] = *lc;
         }
 
@@ -65,29 +67,29 @@ bool SceneSerializer::deserialize(const std::filesystem::path& path) {
         return false;
     }
 
-    m_world.clear();
+    m_scene.clear();
 
     auto entities = root["entities"];
     for (auto& entity_json : entities) {
-        Entity entity = m_world.create_entity();
+        auto entity = m_scene.create_entity();
 
         if (entity_json.contains("TagComponent")) {
-            auto& tc = m_world.add_component<TagComponent>(entity);
+            auto& tc = m_scene.registry().emplace<TagComponent>(entity);
             entity_json["TagComponent"].get_to(tc);
         }
 
         if (entity_json.contains("TransformComponent")) {
-            auto& trc = m_world.add_component<TransformComponent>(entity);
+            auto& trc = m_scene.registry().emplace<TransformComponent>(entity);
             entity_json["TransformComponent"].get_to(trc);
         }
 
         if (entity_json.contains("MeshComponent")) {
-            auto& mc = m_world.add_component<MeshComponent>(entity);
+            auto& mc = m_scene.registry().emplace<MeshComponent>(entity);
             entity_json["MeshComponent"].get_to(mc);
         }
 
         if (entity_json.contains("LightComponent")) {
-            auto& lc = m_world.add_component<LightComponent>(entity);
+            auto& lc = m_scene.registry().emplace<LightComponent>(entity);
             entity_json["LightComponent"].get_to(lc);
         }
     }

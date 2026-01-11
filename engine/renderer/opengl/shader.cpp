@@ -1,17 +1,39 @@
 #include "shader.hpp"
 
+#include <filesystem>
+#include <fstream>
+#include <sstream>
 #include <stdexcept>
+#include <unordered_set>
 #include <vector>
 
 namespace hz::gl {
 
 Shader::Shader(std::string_view vertex_source, std::string_view fragment_source) {
-    GLuint vertex = compile_shader(GL_VERTEX_SHADER, vertex_source);
+    // Determine shader directory (hardcoded for now as we don't pass path here)
+    // In a real engine, we'd pass the file path. For now, assume relative to assets/shaders
+    std::filesystem::path shader_dir = "assets/shaders";
+
+    std::stringstream processed_vert_stream;
+    std::unordered_set<std::string> included_files_vert;
+    if (!process_shader_source(vertex_source, processed_vert_stream, shader_dir,
+                               included_files_vert)) {
+        throw std::runtime_error("Failed to preprocess vertex shader");
+    }
+
+    std::stringstream processed_frag_stream;
+    std::unordered_set<std::string> included_files_frag;
+    if (!process_shader_source(fragment_source, processed_frag_stream, shader_dir,
+                               included_files_frag)) {
+        throw std::runtime_error("Failed to preprocess fragment shader");
+    }
+
+    GLuint vertex = compile_shader(GL_VERTEX_SHADER, processed_vert_stream.str());
     if (vertex == 0) {
         throw std::runtime_error("Failed to compile vertex shader");
     }
 
-    GLuint fragment = compile_shader(GL_FRAGMENT_SHADER, fragment_source);
+    GLuint fragment = compile_shader(GL_FRAGMENT_SHADER, processed_frag_stream.str());
     if (fragment == 0) {
         glDeleteShader(vertex);
         throw std::runtime_error("Failed to compile fragment shader");
@@ -89,6 +111,77 @@ GLuint Shader::compile_shader(GLenum type, std::string_view source) {
     }
 
     return shader;
+}
+
+// ----------------------------------------------------------------------------
+// Shader Preprocessor
+// ----------------------------------------------------------------------------
+bool Shader::process_shader_source(std::string_view source, std::stringstream& final_stream,
+                                   const std::filesystem::path& shader_dir,
+                                   std::unordered_set<std::string>& included_files) {
+
+    std::stringstream source_stream;
+    source_stream << source;
+    std::string line;
+
+    while (std::getline(source_stream, line)) {
+        if (line.find("#include") != std::string::npos) {
+            // Found include directive
+            size_t start = line.find("\"");
+            size_t end = line.rfind("\"");
+
+            if (start != std::string::npos && end != std::string::npos && end > start) {
+                std::string include_path_str = line.substr(start + 1, end - start - 1);
+                std::filesystem::path include_path = shader_dir / include_path_str;
+
+                // Check if file exists, if not try relative to assets/shaders root (optional
+                // fallback) For now, strict relative to current file
+
+                std::error_code ec;
+                std::filesystem::path abs_path =
+                    std::filesystem::weakly_canonical(include_path, ec);
+
+                if (ec) {
+                    HZ_ENGINE_ERROR("Shader Preprocessor: Failed to resolve path: {}",
+                                    include_path.string());
+                    return false;
+                }
+
+                std::string abs_path_str = abs_path.string();
+
+                // Pragma once check
+                if (included_files.find(abs_path_str) != included_files.end()) {
+                    continue; // Already included
+                }
+
+                // Load included file
+                std::ifstream file(include_path);
+                if (file.is_open()) {
+                    std::stringstream buffer;
+                    buffer << file.rdbuf();
+                    included_files.insert(abs_path_str);
+
+                    // Recursive processing
+                    if (!process_shader_source(buffer.str(), final_stream, abs_path.parent_path(),
+                                               included_files)) {
+                        return false;
+                    }
+                    final_stream << "\n"; // Ensure separation
+                } else {
+                    HZ_ENGINE_ERROR("Shader Preprocessor: Failed to open include file: {}",
+                                    include_path.string());
+                    return false;
+                }
+            } else {
+                // Invalid syntax, just print line
+                HZ_ENGINE_WARN("Shader Preprocessor: Invalid #include syntax: {}", line);
+                final_stream << line << "\n";
+            }
+        } else {
+            final_stream << line << "\n";
+        }
+    }
+    return true;
 }
 
 // Uniform setters
