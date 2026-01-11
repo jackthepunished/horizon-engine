@@ -137,17 +137,17 @@ private:
     };
 
     std::vector<AssetSlot<Texture, TextureHandle>> m_textures;
-    std::unordered_map<std::string, u32> m_texture_path_to_index;
+    std::unordered_map<std::string, u32, TransparentStringHash, std::equal_to<>> m_texture_path_to_index;
 
     std::vector<AssetSlot<Model, ModelHandle>> m_models;
-    std::unordered_map<std::string, u32> m_model_path_to_index;
+    std::unordered_map<std::string, u32, TransparentStringHash, std::equal_to<>> m_model_path_to_index;
 
     std::vector<AssetSlot<Material, MaterialHandle>> m_materials;
-    std::unordered_map<std::string, u32> m_material_name_to_index;
+    std::unordered_map<std::string, u32, TransparentStringHash, std::equal_to<>> m_material_name_to_index;
     MaterialHandle m_default_material{};
 
     // Sound cache (path -> handle)
-    std::unordered_map<std::string, SoundHandle> m_loaded_sounds;
+    std::unordered_map<std::string, SoundHandle, TransparentStringHash, std::equal_to<>> m_loaded_sounds;
 };
 
 } // namespace hz

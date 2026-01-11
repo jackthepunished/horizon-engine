@@ -47,7 +47,7 @@ Model Model::load_from_obj(std::string_view path) {
     for (const auto& shape : shapes) {
         std::vector<Vertex> vertices;
         std::vector<u32> indices;
-        std::unordered_map<std::string, u32> unique_vertices;
+        std::unordered_map<std::string, u32, TransparentStringHash, std::equal_to<>> unique_vertices;
 
         for (const auto& index : shape.mesh.indices) {
             Vertex vertex{};

@@ -165,7 +165,7 @@ public:
 
 private:
     std::vector<Bone> m_bones;
-    std::unordered_map<std::string, i32> m_bone_name_to_id;
+    std::unordered_map<std::string, i32, TransparentStringHash, std::equal_to<>> m_bone_name_to_id;
     glm::mat4 m_global_inverse_transform{1.0f};
 
     void calculate_bone_transform_recursive(i32 bone_id, const AnimationClip& clip, float time,

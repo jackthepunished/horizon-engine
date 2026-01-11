@@ -82,7 +82,7 @@ private:
     [[nodiscard]] static GLuint compile_shader(GLenum type, std::string_view source);
 
     GLuint m_program{0};
-    mutable std::unordered_map<std::string, GLint> m_uniform_cache;
+    mutable std::unordered_map<std::string, GLint, TransparentStringHash, std::equal_to<>> m_uniform_cache;
 
     static bool process_shader_source(std::string_view source, std::stringstream& final_stream,
                                       const std::filesystem::path& shader_dir,

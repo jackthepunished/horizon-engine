@@ -10,8 +10,11 @@
 
 #include <cstddef>
 #include <cstdint>
+#include <functional>
 #include <limits>
 #include <numbers>
+#include <string>
+#include <string_view>
 
 namespace hz {
 
@@ -107,6 +110,19 @@ struct GenerationalHandle {
 inline constexpr f64 PI = std::numbers::pi;
 inline constexpr f64 TAU = 2.0 * PI;
 inline constexpr f64 EPSILON = 1e-6;
+
+struct TransparentStringHash {
+    using is_transparent = void;
+    [[nodiscard]] size_t operator()(std::string_view v) const noexcept {
+        return std::hash<std::string_view>{}(v);
+    }
+    [[nodiscard]] size_t operator()(const std::string& v) const noexcept {
+        return operator()(std::string_view{v});
+    }
+    [[nodiscard]] size_t operator()(const char* v) const noexcept {
+        return operator()(std::string_view{v});
+    }
+};
 
 // ============================================================================
 // Utility Macros
