@@ -31,7 +31,7 @@ class Shader;
 class IBL {
 public:
     IBL();
-    ~IBL();
+    ~IBL() noexcept;
 
     HZ_NON_COPYABLE(IBL);
     HZ_DEFAULT_MOVABLE(IBL);

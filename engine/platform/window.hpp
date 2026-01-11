@@ -89,7 +89,7 @@ public:
     /**
      * @brief Destroy the window
      */
-    ~Window();
+    ~Window() noexcept;
 
     HZ_NON_COPYABLE(Window);
     HZ_DEFAULT_MOVABLE(Window);

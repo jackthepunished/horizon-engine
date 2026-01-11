@@ -115,7 +115,7 @@ public:
     /**
      * @brief Destroy the renderer
      */
-    ~Renderer();
+    ~Renderer() noexcept;
 
     HZ_NON_COPYABLE(Renderer);
     HZ_NON_MOVABLE(Renderer);

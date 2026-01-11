@@ -19,7 +19,7 @@ namespace hz::gl {
 class VertexArray {
 public:
     VertexArray();
-    ~VertexArray();
+    ~VertexArray() noexcept;
 
     HZ_NON_COPYABLE(VertexArray);
     HZ_DEFAULT_MOVABLE(VertexArray);
@@ -48,7 +48,7 @@ enum class BufferUsage : GLenum {
 class VertexBuffer {
 public:
     VertexBuffer();
-    ~VertexBuffer();
+    ~VertexBuffer() noexcept;
 
     HZ_NON_COPYABLE(VertexBuffer);
     HZ_DEFAULT_MOVABLE(VertexBuffer);
@@ -85,7 +85,7 @@ private:
 class IndexBuffer {
 public:
     IndexBuffer();
-    ~IndexBuffer();
+    ~IndexBuffer() noexcept;
 
     HZ_NON_COPYABLE(IndexBuffer);
     HZ_DEFAULT_MOVABLE(IndexBuffer);

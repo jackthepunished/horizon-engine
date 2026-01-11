@@ -10,7 +10,7 @@ VertexArray::VertexArray() {
     glGenVertexArrays(1, &m_vao);
 }
 
-VertexArray::~VertexArray() {
+VertexArray::~VertexArray() noexcept {
     if (m_vao != 0) {
         glDeleteVertexArrays(1, &m_vao);
     }
@@ -32,7 +32,7 @@ VertexBuffer::VertexBuffer() {
     glGenBuffers(1, &m_vbo);
 }
 
-VertexBuffer::~VertexBuffer() {
+VertexBuffer::~VertexBuffer() noexcept {
     if (m_vbo != 0) {
         glDeleteBuffers(1, &m_vbo);
     }
@@ -67,7 +67,7 @@ IndexBuffer::IndexBuffer() {
     glGenBuffers(1, &m_ebo);
 }
 
-IndexBuffer::~IndexBuffer() {
+IndexBuffer::~IndexBuffer() noexcept {
     if (m_ebo != 0) {
         glDeleteBuffers(1, &m_ebo);
     }

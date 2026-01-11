@@ -8,7 +8,7 @@ Framebuffer::Framebuffer(const FramebufferConfig& config) : m_config(config) {
     invalidate();
 }
 
-Framebuffer::~Framebuffer() {
+Framebuffer::~Framebuffer() noexcept {
     if (m_fbo) {
         glDeleteFramebuffers(1, &m_fbo);
         glDeleteTextures(1, &m_texture_id);

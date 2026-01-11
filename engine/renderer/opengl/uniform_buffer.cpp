@@ -11,7 +11,7 @@ UniformBuffer::UniformBuffer(usize size, u32 binding_point)
     glBindBuffer(GL_UNIFORM_BUFFER, 0);
 }
 
-UniformBuffer::~UniformBuffer() {
+UniformBuffer::~UniformBuffer() noexcept {
     if (m_ubo) {
         glDeleteBuffers(1, &m_ubo);
     }

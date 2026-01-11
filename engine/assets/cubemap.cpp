@@ -39,7 +39,7 @@ Cubemap::Cubemap(const std::array<std::string, 6>& faces) {
     HZ_ENGINE_INFO("Loaded cubemap with {} faces", 6);
 }
 
-Cubemap::~Cubemap() {
+Cubemap::~Cubemap() noexcept {
     if (m_texture_id) {
         glDeleteTextures(1, &m_texture_id);
     }

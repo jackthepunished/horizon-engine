@@ -31,7 +31,7 @@ struct SoundHandle {
 class AudioSystem {
 public:
     AudioSystem();
-    ~AudioSystem();
+    ~AudioSystem() noexcept;
 
     HZ_NON_COPYABLE(AudioSystem);
     HZ_NON_MOVABLE(AudioSystem);

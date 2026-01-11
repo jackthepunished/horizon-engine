@@ -7,7 +7,7 @@
 
 namespace hz {
 
-Water::~Water() {
+Water::~Water() noexcept {
     if (m_vao) {
         glDeleteVertexArrays(1, &m_vao);
         glDeleteBuffers(1, &m_vbo);

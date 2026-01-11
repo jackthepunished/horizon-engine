@@ -91,7 +91,7 @@ static std::string read_shader_file(const std::string& path) {
 
 IBL::IBL() = default;
 
-IBL::~IBL() {
+IBL::~IBL() noexcept {
     if (m_capture_fbo) glDeleteFramebuffers(1, &m_capture_fbo);
     if (m_capture_rbo) glDeleteRenderbuffers(1, &m_capture_rbo);
     if (m_hdr_texture) glDeleteTextures(1, &m_hdr_texture);

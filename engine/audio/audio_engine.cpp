@@ -16,7 +16,7 @@ struct AudioSystem::Impl {
 // ==========================================
 
 AudioSystem::AudioSystem() : m_impl(std::make_unique<Impl>()) {}
-AudioSystem::~AudioSystem() {
+AudioSystem::~AudioSystem() noexcept {
     shutdown();
 }
 

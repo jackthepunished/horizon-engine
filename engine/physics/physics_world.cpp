@@ -118,7 +118,7 @@ public:
 
 PhysicsWorld::PhysicsWorld() = default;
 
-PhysicsWorld::~PhysicsWorld() {
+PhysicsWorld::~PhysicsWorld() noexcept {
     shutdown();
 }
 

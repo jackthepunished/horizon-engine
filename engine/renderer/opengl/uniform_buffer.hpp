@@ -21,7 +21,7 @@ public:
      * @param binding_point Binding point index (e.g., 0 for Camera, 1 for Scene)
      */
     UniformBuffer(usize size, u32 binding_point);
-    ~UniformBuffer();
+    ~UniformBuffer() noexcept;
 
     HZ_NON_COPYABLE(UniformBuffer);
     HZ_DEFAULT_MOVABLE(UniformBuffer);

@@ -7,7 +7,7 @@
 
 namespace hz {
 
-Texture::~Texture() {
+Texture::~Texture() noexcept {
     if (m_id != 0) {
         glDeleteTextures(1, &m_id);
         HZ_ENGINE_TRACE("Texture {} destroyed", m_id);

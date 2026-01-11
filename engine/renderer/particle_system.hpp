@@ -81,7 +81,7 @@ struct ParticleEmitterConfig {
 class ParticleEmitter {
 public:
     ParticleEmitter() = default;
-    ~ParticleEmitter();
+    ~ParticleEmitter() noexcept;
 
     HZ_NON_COPYABLE(ParticleEmitter);
     ParticleEmitter(ParticleEmitter&& other) noexcept;

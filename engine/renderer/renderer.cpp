@@ -44,7 +44,7 @@ Renderer::Renderer(Window& window) : m_window(&window) {
     init_ubos();
 }
 
-Renderer::~Renderer() {
+Renderer::~Renderer() noexcept {
     if (m_ssao_noise_texture)
         glDeleteTextures(1, &m_ssao_noise_texture);
     HZ_ENGINE_INFO("OpenGL Renderer destroyed");

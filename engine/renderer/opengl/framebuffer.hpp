@@ -23,7 +23,7 @@ struct FramebufferConfig {
 class Framebuffer {
 public:
     explicit Framebuffer(const FramebufferConfig& config);
-    ~Framebuffer();
+    ~Framebuffer() noexcept;
 
     HZ_NON_COPYABLE(Framebuffer);
     HZ_DEFAULT_MOVABLE(Framebuffer);

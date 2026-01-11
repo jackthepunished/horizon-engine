@@ -35,7 +35,7 @@ struct WaterConfig {
 class Water {
 public:
     Water() = default;
-    ~Water();
+    ~Water() noexcept;
 
     HZ_NON_COPYABLE(Water);
     Water(Water&& other) noexcept;

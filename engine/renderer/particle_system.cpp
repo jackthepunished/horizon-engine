@@ -14,7 +14,7 @@ namespace hz {
 // ParticleEmitter
 // ============================================================================
 
-ParticleEmitter::~ParticleEmitter() {
+ParticleEmitter::~ParticleEmitter() noexcept {
     if (m_vao) {
         glDeleteVertexArrays(1, &m_vao);
         glDeleteBuffers(1, &m_quad_vbo);

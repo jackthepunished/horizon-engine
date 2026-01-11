@@ -10,7 +10,7 @@
 
 namespace hz {
 
-Grass::~Grass() {
+Grass::~Grass() noexcept {
     if (m_vao)
         glDeleteVertexArrays(1, &m_vao);
     if (m_vbo)

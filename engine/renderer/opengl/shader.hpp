@@ -33,7 +33,7 @@ public:
     /**
      * @brief Destroy shader program
      */
-    ~Shader();
+    ~Shader() noexcept;
 
     HZ_NON_COPYABLE(Shader);
     HZ_DEFAULT_MOVABLE(Shader);

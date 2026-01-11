@@ -47,7 +47,7 @@ struct TextureParams {
 class Texture {
 public:
     Texture() = default;
-    ~Texture();
+    ~Texture() noexcept;
 
     HZ_NON_COPYABLE(Texture);
 

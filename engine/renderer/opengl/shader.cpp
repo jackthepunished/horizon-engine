@@ -66,7 +66,7 @@ Shader::Shader(std::string_view vertex_source, std::string_view fragment_source)
     HZ_ENGINE_TRACE("Shader program {} created", m_program);
 }
 
-Shader::~Shader() {
+Shader::~Shader() noexcept {
     if (m_program != 0) {
         glDeleteProgram(m_program);
         HZ_ENGINE_TRACE("Shader program {} destroyed", m_program);

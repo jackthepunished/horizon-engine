@@ -64,7 +64,7 @@ Window::Window(const WindowConfig& config) {
     HZ_ENGINE_INFO("Window created: {}x{} ('{}')", w, h, config.title);
 }
 
-Window::~Window() {
+Window::~Window() noexcept {
     if (m_window) {
         glfwDestroyWindow(m_window);
         HZ_ENGINE_TRACE("Window destroyed");

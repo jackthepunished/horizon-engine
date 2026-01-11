@@ -75,7 +75,7 @@ struct RaycastHit {
 class PhysicsWorld {
 public:
     PhysicsWorld();
-    ~PhysicsWorld();
+    ~PhysicsWorld() noexcept;
 
     HZ_NON_COPYABLE(PhysicsWorld);
     HZ_NON_MOVABLE(PhysicsWorld);

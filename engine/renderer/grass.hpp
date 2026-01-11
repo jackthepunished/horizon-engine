@@ -43,7 +43,7 @@ struct GrassInstance {
 class Grass {
 public:
     Grass() = default;
-    ~Grass();
+    ~Grass() noexcept;
 
     HZ_NON_COPYABLE(Grass);
     HZ_DEFAULT_MOVABLE(Grass);

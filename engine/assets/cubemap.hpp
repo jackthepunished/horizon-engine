@@ -25,7 +25,7 @@ public:
      * @param faces Array of paths: [right, left, top, bottom, front, back]
      */
     explicit Cubemap(const std::array<std::string, 6>& faces);
-    ~Cubemap();
+    ~Cubemap() noexcept;
 
     HZ_NON_COPYABLE(Cubemap);
     HZ_DEFAULT_MOVABLE(Cubemap);
