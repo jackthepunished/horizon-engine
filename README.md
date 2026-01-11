@@ -11,11 +11,17 @@ I'm learning OpenGL, so this is a work in progress. Planning to migrate (or from
 I'm using this project to learn and experiment with new technologies.
 Strictly keeping up with learnopengl.com
 
+### News (2026-01-11)
+
+**⟳ Migrated to EnTT**: Switched the internal ECS from a custom implementation to [EnTT](https://github.com/skypjack/entt).
+
+> _Why?_ Our custom linear-memory ECS was educational, but EnTT provides a battle-tested sparse set implementation, significantly better performance, and standard C++ iterator support, allowing us to focus on gameplay logic rather than maintaining low-level architecture.
+
 ## Features
 
 ### Core Systems
 
-- **Entity-Component-System (ECS)** - Data-oriented architecture for high performance
+- **Entity-Component-System (ECS)** - Powered by [EnTT](https://github.com/skypjack/entt) for maximum performance
 - **Physics Integration** - Rigid body dynamics using Jolt Physics
 - **Audio System** - 3D spatial audio using miniaudio
 - **Action-Based Input** - Abstract input mapping for keyboard, mouse, and gamepad
