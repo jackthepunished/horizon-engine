@@ -963,98 +963,93 @@ public:
                 view.each([&](auto entity) {
                     auto* tc = scene.registry().try_get<hz::TransformComponent>(entity);
                     auto* mc = scene.registry().try_get<hz::MeshComponent>(entity);
-
-                    if (tc && mc) {
-                        // Set Model Matrix
-                        pbr_shader.set_mat4("u_model", tc->get_transform());
-
-                        // Set PBR Material Properties
-                        pbr_shader.set_vec3("u_albedo", mc->albedo_color);
-                        pbr_shader.set_float("u_metallic", mc->metallic);
-                        pbr_shader.set_float("u_roughness", mc->roughness);
-                        pbr_shader.set_float("u_ao", 1.0f);
-
-                        // Texture Binding (Hardcoded mapping for demo assets)
-                        bool use_textures = false;
-                        bool use_normal_map = false;
-
-                        if (mc->albedo_path == "wood") {
-                            if (auto* t = assets.get_texture(tex_handle))
-                                t->bind(0);
-                            if (auto* t = assets.get_texture(normal_map_handle))
-                                t->bind(1);
-                            // Wood in this demo is just albedo+normal, no PBR maps loaded for it
-                            // specifically So we use defaults or maybe reuse custom? For now
-                            // disable other maps for wood to be safe
-                            pbr_shader.set_bool("u_use_metallic_map", false);
-                            pbr_shader.set_bool("u_use_roughness_map", false);
-                            pbr_shader.set_bool("u_use_ao_map", false);
-
-                            use_textures = true;
-                            use_normal_map = true;
-                        } else if (mc->albedo_path == "brick") {
-                            // "Brick" in our Setup seems to be the Custom PBR set
-                            if (auto* t = assets.get_texture(custom_albedo))
-                                t->bind(0);
-                            if (auto* t = assets.get_texture(custom_normal))
-                                t->bind(1);
-                            if (auto* t = assets.get_texture(custom_metallic))
-                                t->bind(2);
-                            if (auto* t = assets.get_texture(custom_roughness))
-                                t->bind(3);
-                            if (auto* t = assets.get_texture(custom_ao))
-                                t->bind(4);
-
-                            use_textures = true;
-                            use_normal_map = true;
-                            pbr_shader.set_bool("u_use_metallic_map", true);
-                            pbr_shader.set_bool("u_use_roughness_map", true);
-                            pbr_shader.set_bool("u_use_ao_map", true);
-
-                            // Special tiling for floor
-                            if (mc->mesh_path == "plane") {
-                                pbr_shader.set_float("u_uv_scale", 100.0f);
-                            }
-                        } else if (mc->albedo_path == "metal") {
-                            if (auto* t = assets.get_texture(metal_albedo_handle))
-                                t->bind(0);
-                            use_textures = true;
-                            pbr_shader.set_bool("u_use_metallic_map", false);
-                            pbr_shader.set_bool("u_use_roughness_map", false);
-                            pbr_shader.set_bool("u_use_normal_map", false);
-                        }
-
-                        pbr_shader.set_bool("u_use_textures", use_textures);
-                        pbr_shader.set_bool("u_use_normal_map", use_normal_map);
-
-                        // DRAW
-                        if (mc->mesh_path == "cube") {
-                            cube.draw();
-                        } else if (mc->mesh_path == "plane") {
-                            ground_cube.draw();
-                        } else if (mc->mesh_path == "assets/models/demon_weapon/scene.gltf") {
-                            // Setup animations for this entity
-                            auto* anim = scene.registry().try_get<hz::AnimatorComponent>(entity);
-                            if (anim && anim->skeleton && !anim->bone_transforms.empty()) {
-                                pbr_shader.set_bool("u_has_animations", true);
-                                pbr_shader.set_mat4_array(
-                                    "u_bone_matrices", anim->bone_transforms.data(),
-                                    static_cast<hz::u32>(anim->bone_transforms.size()));
-                            } else {
-                                pbr_shader.set_bool("u_has_animations", false);
-                            }
-
-                            if (weapon_model.is_valid()) {
-                                weapon_model.draw();
-                            }
-                        } else {
-                            // Ensure animations are disabled for standard meshes (cube, plane, etc)
-                            pbr_shader.set_bool("u_has_animations", false);
-                        }
-
-                        // Reset Tiling
-                        pbr_shader.set_float("u_uv_scale", 1.0f);
+                    if (!tc || !mc) {
+                        return;
                     }
+
+                    pbr_shader.set_mat4("u_model", tc->get_transform());
+                    pbr_shader.set_vec3("u_albedo", mc->albedo_color);
+                    pbr_shader.set_float("u_metallic", mc->metallic);
+                    pbr_shader.set_float("u_roughness", mc->roughness);
+                    pbr_shader.set_float("u_ao", 1.0f);
+
+                    auto apply_wood = [&]() {
+                        if (auto* t = assets.get_texture(tex_handle))
+                            t->bind(0);
+                        if (auto* t = assets.get_texture(normal_map_handle))
+                            t->bind(1);
+                        pbr_shader.set_bool("u_use_metallic_map", false);
+                        pbr_shader.set_bool("u_use_roughness_map", false);
+                        pbr_shader.set_bool("u_use_ao_map", false);
+                        pbr_shader.set_bool("u_use_textures", true);
+                        pbr_shader.set_bool("u_use_normal_map", true);
+                    };
+
+                    auto apply_brick = [&]() {
+                        if (auto* t = assets.get_texture(custom_albedo))
+                            t->bind(0);
+                        if (auto* t = assets.get_texture(custom_normal))
+                            t->bind(1);
+                        if (auto* t = assets.get_texture(custom_metallic))
+                            t->bind(2);
+                        if (auto* t = assets.get_texture(custom_roughness))
+                            t->bind(3);
+                        if (auto* t = assets.get_texture(custom_ao))
+                            t->bind(4);
+                        pbr_shader.set_bool("u_use_textures", true);
+                        pbr_shader.set_bool("u_use_normal_map", true);
+                        pbr_shader.set_bool("u_use_metallic_map", true);
+                        pbr_shader.set_bool("u_use_roughness_map", true);
+                        pbr_shader.set_bool("u_use_ao_map", true);
+                        if (mc->mesh_path == "plane") {
+                            pbr_shader.set_float("u_uv_scale", 100.0f);
+                        }
+                    };
+
+                    auto apply_metal = [&]() {
+                        if (auto* t = assets.get_texture(metal_albedo_handle))
+                            t->bind(0);
+                        pbr_shader.set_bool("u_use_textures", true);
+                        pbr_shader.set_bool("u_use_metallic_map", false);
+                        pbr_shader.set_bool("u_use_roughness_map", false);
+                        pbr_shader.set_bool("u_use_normal_map", false);
+                    };
+
+                    const auto& albedo_path = mc->albedo_path;
+                    if (albedo_path == "wood") {
+                        apply_wood();
+                    } else if (albedo_path == "brick") {
+                        apply_brick();
+                    } else if (albedo_path == "metal") {
+                        apply_metal();
+                    } else {
+                        pbr_shader.set_bool("u_use_textures", false);
+                        pbr_shader.set_bool("u_use_normal_map", false);
+                    }
+
+                    if (mc->mesh_path == "cube") {
+                        cube.draw();
+                    } else if (mc->mesh_path == "plane") {
+                        ground_cube.draw();
+                    } else if (mc->mesh_path == "assets/models/demon_weapon/scene.gltf") {
+                        auto* anim = scene.registry().try_get<hz::AnimatorComponent>(entity);
+                        const bool animated =
+                            anim && anim->skeleton && !anim->bone_transforms.empty();
+                        pbr_shader.set_bool("u_has_animations", animated);
+                        if (animated) {
+                            pbr_shader.set_mat4_array("u_bone_matrices",
+                                                      anim->bone_transforms.data(),
+                                                      static_cast<hz::u32>(anim->bone_transforms.size()));
+                        }
+
+                        if (weapon_model.is_valid()) {
+                            weapon_model.draw();
+                        }
+                    } else {
+                        pbr_shader.set_bool("u_has_animations", false);
+                    }
+
+                    pbr_shader.set_float("u_uv_scale", 1.0f);
                 });
             }
 
