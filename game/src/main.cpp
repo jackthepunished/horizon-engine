@@ -424,6 +424,25 @@ public:
         std::string particle_frag = read_file("assets/shaders/particle.frag");
         hz::gl::Shader particle_shader(particle_vert, particle_frag);
 
+        // Load volumetric fog shader
+        std::string volumetric_vert = read_file("assets/shaders/volumetric.vert");
+        std::string volumetric_frag = read_file("assets/shaders/volumetric.frag");
+        hz::gl::Shader volumetric_shader(volumetric_vert, volumetric_frag);
+        
+        // Volumetric fog settings
+        struct VolumetricSettings {
+            bool enabled = true;
+            float fog_density = 0.015f;
+            float fog_height_falloff = 0.1f;
+            float fog_base_height = 0.0f;
+            glm::vec3 fog_color = glm::vec3(0.7f, 0.8f, 0.95f);
+            float scattering_coeff = 0.5f;
+            float absorption_coeff = 0.02f;
+            float god_ray_intensity = 1.2f;
+            float god_ray_decay = 0.95f;
+            int ray_march_steps = 32;
+        } volumetric_settings;
+
         // ==========================================
         // Load Plant Model (Periwinkle)
         // ==========================================
@@ -1357,12 +1376,51 @@ public:
             renderer.end_scene_pass(); // Writes to HDR FBO
 
             // ========================================
-            // 3. Bloom Pass (Extract + Blur)
+            // 3. Volumetric Fog / God Rays Pass
+            // ========================================
+            if (volumetric_settings.enabled) {
+                volumetric_shader.bind();
+                
+                // Camera uniforms
+                glm::mat4 inv_view_proj = glm::inverse(projection * view);
+                volumetric_shader.set_mat4("u_inverse_view_projection", inv_view_proj);
+                volumetric_shader.set_vec3("u_camera_pos", camera.position());
+                volumetric_shader.set_float("u_near_plane", 0.1f);
+                volumetric_shader.set_float("u_far_plane", 1000.0f);
+                
+                // Light uniforms
+                glm::vec3 light_dir = -glm::normalize(lighting.sun.direction);
+                volumetric_shader.set_vec3("u_light_dir", light_dir);
+                volumetric_shader.set_vec3("u_light_color", lighting.sun.color);
+                volumetric_shader.set_float("u_light_intensity", lighting.sun.intensity);
+                volumetric_shader.set_mat4("u_light_space_matrix", light_space_matrix);
+                
+                // Volumetric settings
+                volumetric_shader.set_float("u_fog_density", volumetric_settings.fog_density);
+                volumetric_shader.set_float("u_fog_height_falloff", volumetric_settings.fog_height_falloff);
+                volumetric_shader.set_float("u_fog_base_height", volumetric_settings.fog_base_height);
+                volumetric_shader.set_vec3("u_fog_color", volumetric_settings.fog_color);
+                volumetric_shader.set_float("u_scattering_coeff", volumetric_settings.scattering_coeff);
+                volumetric_shader.set_float("u_absorption_coeff", volumetric_settings.absorption_coeff);
+                
+                // God rays settings
+                volumetric_shader.set_float("u_god_ray_intensity", volumetric_settings.god_ray_intensity);
+                volumetric_shader.set_float("u_god_ray_decay", volumetric_settings.god_ray_decay);
+                volumetric_shader.set_int("u_ray_march_steps", volumetric_settings.ray_march_steps);
+                
+                // Time for noise animation
+                volumetric_shader.set_float("u_time", static_cast<float>(glfwGetTime()));
+                
+                renderer.render_volumetric(volumetric_shader);
+            }
+
+            // ========================================
+            // 4. Bloom Pass (Extract + Blur)
             // ========================================
             renderer.render_bloom(bloom_extract_shader, blur_shader, 0.8f, 5);
 
             // ========================================
-            // 4. Post-Process Pass (HDR + Bloom -> Screen)
+            // 5. Post-Process Pass (HDR + Bloom -> Screen)
             // ========================================
             hdr_shader.bind();
             glActiveTexture(GL_TEXTURE0 + 1);

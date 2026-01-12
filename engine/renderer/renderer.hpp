@@ -239,6 +239,11 @@ public:
 
     [[nodiscard]] u32 get_scene_texture_id() const;
     [[nodiscard]] u32 get_shadow_map_texture_id() const;
+    [[nodiscard]] u32 get_scene_depth_texture_id() const;
+
+    // Volumetric Fog / God Rays
+    void render_volumetric(gl::Shader& volumetric_shader);
+    [[nodiscard]] u32 get_volumetric_texture_id() const;
 
     // UBOs
     void update_camera(const glm::mat4& view, const glm::mat4& projection,
@@ -277,6 +282,9 @@ private:
 
     std::vector<glm::vec3> m_ssao_kernel;
     u32 m_ssao_noise_texture{0};
+
+    // Volumetric Fog
+    std::unique_ptr<gl::Framebuffer> m_volumetric_fbo;
 };
 
 } // namespace hz

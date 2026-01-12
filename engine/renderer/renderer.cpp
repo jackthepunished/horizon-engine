@@ -397,9 +397,13 @@ void Renderer::render_post_process(const gl::Shader& hdr_shader) {
 
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT); // Clear default framebuffer
 
+    // Use volumetric output if available, otherwise use HDR scene
+    u32 source_texture = m_volumetric_fbo ? m_volumetric_fbo->get_texture_id() 
+                                          : m_hdr_fbo->get_texture_id();
+
     hdr_shader.bind();
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, m_hdr_fbo->get_texture_id());
+    glBindTexture(GL_TEXTURE_2D, source_texture);
 
     glBindVertexArray(m_quad_vao);
     glDrawArrays(GL_TRIANGLES, 0, 6);
@@ -408,6 +412,61 @@ void Renderer::render_post_process(const gl::Shader& hdr_shader) {
 
 u32 Renderer::get_scene_texture_id() const {
     return m_hdr_fbo ? m_hdr_fbo->get_texture_id() : 0;
+}
+
+u32 Renderer::get_scene_depth_texture_id() const {
+    return m_gbuffer_fbo ? m_gbuffer_fbo->get_depth_texture_id() : 0;
+}
+
+u32 Renderer::get_volumetric_texture_id() const {
+    return m_volumetric_fbo ? m_volumetric_fbo->get_texture_id() : 0;
+}
+
+void Renderer::render_volumetric(gl::Shader& volumetric_shader) {
+    if (!m_hdr_fbo || !m_gbuffer_fbo)
+        return;
+    if (!m_quad_vao)
+        init_quad();
+
+    auto [width, height] = m_window->framebuffer_size();
+
+    // Create volumetric FBO if needed (same resolution as scene)
+    if (!m_volumetric_fbo || m_volumetric_fbo->config().width != width) {
+        gl::FramebufferConfig vol_config;
+        vol_config.width = width;
+        vol_config.height = height;
+        vol_config.hdr = true;
+        m_volumetric_fbo = std::make_unique<gl::Framebuffer>(vol_config);
+    }
+
+    // Render volumetric fog to volumetric FBO
+    m_volumetric_fbo->bind();
+    glClear(GL_COLOR_BUFFER_BIT);
+    glDisable(GL_DEPTH_TEST);
+
+    volumetric_shader.bind();
+    
+    // Bind scene texture (slot 0)
+    glActiveTexture(GL_TEXTURE0 + 0);
+    glBindTexture(GL_TEXTURE_2D, m_hdr_fbo->get_texture_id());
+    volumetric_shader.set_int("u_scene_texture", 0);
+    
+    // Bind depth texture (slot 1)
+    glActiveTexture(GL_TEXTURE0 + 1);
+    glBindTexture(GL_TEXTURE_2D, m_gbuffer_fbo->get_depth_texture_id());
+    volumetric_shader.set_int("u_depth_texture", 1);
+    
+    // Bind shadow map (slot 2)
+    glActiveTexture(GL_TEXTURE0 + 2);
+    glBindTexture(GL_TEXTURE_2D, get_shadow_map_texture_id());
+    volumetric_shader.set_int("u_shadow_map", 2);
+
+    glBindVertexArray(m_quad_vao);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+    glBindVertexArray(0);
+
+    glEnable(GL_DEPTH_TEST);
+    m_volumetric_fbo->unbind();
 }
 
 u32 Renderer::get_bloom_texture_id() const {
@@ -440,6 +499,10 @@ void Renderer::render_bloom(gl::Shader& extract_shader, gl::Shader& blur_shader,
 
     glViewport(0, 0, static_cast<GLsizei>(bloom_width), static_cast<GLsizei>(bloom_height));
 
+    // Use volumetric output if available, otherwise use HDR scene
+    u32 source_texture = m_volumetric_fbo ? m_volumetric_fbo->get_texture_id() 
+                                          : m_hdr_fbo->get_texture_id();
+
     // Pass 1: Extract bright pixels
     m_bloom_fbo->bind();
     glClear(GL_COLOR_BUFFER_BIT);
@@ -447,7 +510,7 @@ void Renderer::render_bloom(gl::Shader& extract_shader, gl::Shader& blur_shader,
     extract_shader.set_int("u_scene", 0);
     extract_shader.set_float("u_threshold", threshold);
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, m_hdr_fbo->get_texture_id());
+    glBindTexture(GL_TEXTURE_2D, source_texture);
     glBindVertexArray(m_quad_vao);
     glDrawArrays(GL_TRIANGLES, 0, 6);
     m_bloom_fbo->unbind();
