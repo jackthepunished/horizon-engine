@@ -537,10 +537,10 @@ public:
         // ==========================================
         hz::SceneLighting lighting;
         // Initial lighting (will be synced from editor settings in render loop)
-        lighting.sun.direction = glm::normalize(glm::vec3(0.0f, -1.0f, 0.0f));  // Overhead
+        lighting.sun.direction = glm::normalize(glm::vec3(0.2f, -0.9f, 0.1f));  // Slight angle
         lighting.sun.color = glm::vec3(1.0f, 0.98f, 0.95f);   // Bright white
-        lighting.sun.intensity = 6.0f;                         // Strong
-        lighting.ambient_light = glm::vec3(0.4f, 0.5f, 0.6f);  // Bright ambient
+        lighting.sun.intensity = 5.0f;                         // Strong
+        lighting.ambient_light = glm::vec3(0.5f, 0.55f, 0.6f); // Brighter ambient
 
         // Point Light 0 - Warm orange (orbiting)
         lighting.point_lights.push_back({});
@@ -577,8 +577,11 @@ public:
         lighting.point_lights[4].range = 20.0f;
 
         hz::ShadowSettings shadow_settings;
-        shadow_settings.resolution = 2048; // High res
+        shadow_settings.resolution = 4096;    // Higher res for larger area
         shadow_settings.enabled = true;
+        shadow_settings.ortho_size = 80.0f;   // Cover much larger area (160x160)
+        shadow_settings.near_plane = 0.1f;
+        shadow_settings.far_plane = 150.0f;   // Increased for overhead sun
         renderer.set_shadow_settings(shadow_settings);
 
         // ==========================================

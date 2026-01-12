@@ -37,6 +37,10 @@ set(ENGINE_SOURCES
 
     # Physics
     physics/physics_world.cpp
+    physics/fps_character_controller.cpp
+    physics/hitbox_system.cpp
+    physics/projectile_system.cpp
+    physics/physics_interactions.cpp
 
     # UI
     ui/imgui_layer.cpp
@@ -54,9 +58,9 @@ set(ENGINE_SOURCES
     renderer/billboard.cpp
     renderer/opengl/buffer.cpp
     renderer/opengl/framebuffer.cpp
-    renderer/opengl/framebuffer.cpp
     renderer/opengl/shader.cpp
     renderer/opengl/uniform_buffer.cpp
+    renderer/deferred_renderer.cpp
 
     # Audio
     audio/audio_engine.cpp
@@ -98,6 +102,10 @@ set(ENGINE_HEADERS
 
     # Physics
     physics/physics_world.hpp
+    physics/fps_character_controller.hpp
+    physics/hitbox_system.hpp
+    physics/projectile_system.hpp
+    physics/physics_interactions.hpp
 
     # UI
     ui/imgui_layer.hpp
