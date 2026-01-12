@@ -519,11 +519,11 @@ public:
         // Setup Lighting
         // ==========================================
         hz::SceneLighting lighting;
-        // Bright daylight sun: high angle for better illumination
-        lighting.sun.direction = glm::normalize(glm::vec3(0.5f, -0.8f, 0.3f));  // Higher sun angle
-        lighting.sun.color = glm::vec3(1.0f, 0.95f, 0.85f);   // Bright warm white
-        lighting.sun.intensity = 6.0f;                         // Increased from 4.0
-        lighting.ambient_light = glm::vec3(0.4f, 0.5f, 0.6f);  // Brighter ambient
+        // Initial lighting (will be synced from editor settings in render loop)
+        lighting.sun.direction = glm::normalize(glm::vec3(0.0f, -1.0f, 0.0f));  // Overhead
+        lighting.sun.color = glm::vec3(1.0f, 0.98f, 0.95f);   // Bright white
+        lighting.sun.intensity = 6.0f;                         // Strong
+        lighting.ambient_light = glm::vec3(0.4f, 0.5f, 0.6f);  // Bright ambient
 
         // Point Light 0 - Warm orange (orbiting)
         lighting.point_lights.push_back({});
@@ -931,6 +931,12 @@ public:
             // 2. Scene Lighting Pass (Render to HDR FBO)
             // ========================================
             renderer.begin_scene_pass();
+
+            // Sync editor settings to lighting struct
+            lighting.sun.direction = glm::normalize(settings.sun_direction);
+            lighting.sun.color = settings.sun_color;
+            lighting.sun.intensity = settings.sun_intensity;
+            lighting.ambient_light = settings.ambient_color * settings.ambient_intensity;
 
             // Submit and Apply Lighting
             renderer.submit_lighting(lighting);
