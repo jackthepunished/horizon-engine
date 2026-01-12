@@ -490,14 +490,19 @@ public:
         std::string billboard_frag = read_file("assets/shaders/billboard.frag");
         hz::gl::Shader billboard_shader(billboard_vert, billboard_frag);
         
+        // Load tree billboard texture
+        hz::TextureHandle tree_billboard_tex = 
+            assets.load_texture("assets/textures/terrain/tree_billboard.png");
+        HZ_LOG_INFO("Loaded tree billboard texture");
+        
         // Generate billboard trees
-        const int BILLBOARD_TREE_COUNT = 100;
+        const int BILLBOARD_TREE_COUNT = 150;
         std::vector<hz::BillboardInstance> tree_instances;
         tree_instances.reserve(BILLBOARD_TREE_COUNT);
         
         std::mt19937 tree_rng(9999);
-        std::uniform_real_distribution<float> tree_dist_x(-50.0f, 50.0f);
-        std::uniform_real_distribution<float> tree_dist_z(-50.0f, 50.0f);
+        std::uniform_real_distribution<float> tree_dist_x(-60.0f, 60.0f);
+        std::uniform_real_distribution<float> tree_dist_z(-60.0f, 60.0f);
         
         for (int i = 0; i < BILLBOARD_TREE_COUNT; ++i) {
             float x = tree_dist_x(tree_rng);
@@ -505,21 +510,20 @@ public:
             float y = terrain.get_height_at(x, z) - 5.0f; // Match terrain offset
             
             // Don't spawn too close to center
-            if (x * x + z * z < 150.0f)
+            if (x * x + z * z < 200.0f)
                 continue;
             
             hz::BillboardInstance tree;
             tree.position = glm::vec3(x, y, z);
             
             // Random size variation (width, height)
-            float height = 4.0f + static_cast<float>(tree_rng() % 100) / 25.0f; // 4-8 units
-            float width = height * 0.6f; // Trees are taller than wide
+            float height = 6.0f + static_cast<float>(tree_rng() % 100) / 20.0f; // 6-11 units
+            float width = height * 0.8f; // Aspect ratio for tree texture
             tree.size = glm::vec2(width, height);
             
-            // Green color with slight variation
-            float green_var = 0.3f + static_cast<float>(tree_rng() % 100) / 200.0f; // 0.3-0.8
-            float brown_tint = static_cast<float>(tree_rng() % 100) / 500.0f; // 0-0.2
-            tree.color = glm::vec4(0.1f + brown_tint, green_var, 0.05f, 1.0f);
+            // White color to show texture correctly, slight brightness variation
+            float brightness = 0.9f + static_cast<float>(tree_rng() % 100) / 500.0f; // 0.9-1.1
+            tree.color = glm::vec4(brightness, brightness, brightness, 1.0f);
             
             tree_instances.push_back(tree);
         }
@@ -1254,7 +1258,13 @@ public:
             billboard_shader.bind();
             billboard_shader.bind_uniform_block("CameraData", 0);
             billboard_shader.bind_uniform_block("SceneData", 1);
-            billboard_shader.set_bool("u_use_texture", false); // Using solid colors
+            billboard_shader.set_bool("u_use_texture", true);
+            billboard_shader.set_int("u_texture", 0);
+            
+            // Bind tree texture
+            if (auto* tex = assets.get_texture(tree_billboard_tex)) {
+                tex->bind(0);
+            }
             
             tree_billboards.draw();
             
