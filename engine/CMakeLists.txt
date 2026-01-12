@@ -51,6 +51,7 @@ set(ENGINE_SOURCES
     renderer/grass.cpp
     renderer/water.cpp
     renderer/particle_system.cpp
+    renderer/billboard.cpp
     renderer/opengl/buffer.cpp
     renderer/opengl/framebuffer.cpp
     renderer/opengl/framebuffer.cpp
@@ -111,6 +112,7 @@ set(ENGINE_HEADERS
     renderer/grass.hpp
     renderer/water.hpp
     renderer/particle_system.hpp
+    renderer/billboard.hpp
     renderer/opengl/gl_context.hpp
     renderer/opengl/shader.hpp
     renderer/opengl/shader.hpp

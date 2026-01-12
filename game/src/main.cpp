@@ -22,6 +22,7 @@
 #include <engine/platform/input.hpp>
 #include <engine/platform/window.hpp>
 #include <engine/renderer/camera.hpp>
+#include <engine/renderer/billboard.hpp>
 #include <engine/renderer/grass.hpp>
 #include <engine/renderer/ibl.hpp>
 #include <engine/renderer/particle_system.hpp>
@@ -478,45 +479,54 @@ public:
         HZ_LOG_INFO("Generated {} plant instances", plant_matrices.size());
 
         // ==========================================
-        // Load Tree Model (DISABLED - performance issue)
+        // Billboard Trees (performant alternative to 3D models)
         // ==========================================
-        // TODO: Tree model causes major FPS drops, needs optimization
-        // - Model might be too complex
-        // - Y offset doesn't match terrain (-5 offset)
-        // - Instancing setup might have issues
-        /*
-        hz::Model tree_model = hz::Model::load_from_gltf(
-            "assets/models/vegetation/island_tree_01/island_tree_01_2k.gltf");
-        HZ_LOG_INFO("Loaded tree model (valid={})", tree_model.is_valid());
-
-        const int TREE_COUNT = 10;
-        std::vector<glm::mat4> tree_matrices;
-        tree_matrices.reserve(TREE_COUNT);
-
-        hz::TextureHandle tree_albedo = assets.load_texture(
-            "assets/models/vegetation/island_tree_01/textures/island_tree_01_diff_2k.jpg");
-
+        hz::BillboardConfig tree_billboard_config;
+        tree_billboard_config.max_instances = 200;
+        hz::Billboard tree_billboards(tree_billboard_config);
+        
+        // Load billboard shader
+        std::string billboard_vert = read_file("assets/shaders/billboard.vert");
+        std::string billboard_frag = read_file("assets/shaders/billboard.frag");
+        hz::gl::Shader billboard_shader(billboard_vert, billboard_frag);
+        
+        // Generate billboard trees
+        const int BILLBOARD_TREE_COUNT = 100;
+        std::vector<hz::BillboardInstance> tree_instances;
+        tree_instances.reserve(BILLBOARD_TREE_COUNT);
+        
         std::mt19937 tree_rng(9999);
-        for (int i = 0; i < TREE_COUNT; ++i) {
-            float x = plant_dist_x(tree_rng);
-            float z = plant_dist_z(tree_rng);
+        std::uniform_real_distribution<float> tree_dist_x(-50.0f, 50.0f);
+        std::uniform_real_distribution<float> tree_dist_z(-50.0f, 50.0f);
+        
+        for (int i = 0; i < BILLBOARD_TREE_COUNT; ++i) {
+            float x = tree_dist_x(tree_rng);
+            float z = tree_dist_z(tree_rng);
             float y = terrain.get_height_at(x, z) - 5.0f; // Match terrain offset
-
-            if (x * x + z * z < 100.0f)
+            
+            // Don't spawn too close to center
+            if (x * x + z * z < 150.0f)
                 continue;
-
-            glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(x, y, z));
-            float scale = 3.0f + (static_cast<float>(tree_rng() % 100) / 50.0f);
-            model = glm::scale(model, glm::vec3(scale));
-            float rot = static_cast<float>(tree_rng() % 360);
-            model = glm::rotate(model, glm::radians(rot), glm::vec3(0.0f, 1.0f, 0.0f));
-
-            tree_matrices.push_back(model);
+            
+            hz::BillboardInstance tree;
+            tree.position = glm::vec3(x, y, z);
+            
+            // Random size variation (width, height)
+            float height = 4.0f + static_cast<float>(tree_rng() % 100) / 25.0f; // 4-8 units
+            float width = height * 0.6f; // Trees are taller than wide
+            tree.size = glm::vec2(width, height);
+            
+            // Green color with slight variation
+            float green_var = 0.3f + static_cast<float>(tree_rng() % 100) / 200.0f; // 0.3-0.8
+            float brown_tint = static_cast<float>(tree_rng() % 100) / 500.0f; // 0-0.2
+            tree.color = glm::vec4(0.1f + brown_tint, green_var, 0.05f, 1.0f);
+            
+            tree_instances.push_back(tree);
         }
-        tree_model.setup_instancing(tree_matrices);
-        HZ_LOG_INFO("Generated {} tree instances", tree_matrices.size());
-        */
-        HZ_LOG_INFO("Tree rendering disabled for performance");
+        
+        tree_billboards.set_instances(tree_instances);
+        tree_billboards.upload();
+        HZ_LOG_INFO("Generated {} billboard trees", tree_billboards.instance_count());
 
         // ==========================================
         // Setup Lighting
@@ -1235,21 +1245,20 @@ public:
             glEnable(GL_CULL_FACE);
 
             // ========================================
-            // Render Trees (DISABLED - performance issue)
+            // Render Billboard Trees
             // ========================================
-            // TODO: Fix tree rendering - Y offset mismatch with terrain
-            // Trees spawn at terrain.get_height_at() but terrain renders at Y-5
-            /*
-            glDisable(GL_CULL_FACE);
-            pbr_shader.set_bool("u_instanced", true);
-            pbr_shader.set_bool("u_use_textures", true);
-            if (auto* t = assets.get_texture(tree_albedo)) {
-                t->bind(0);
-            }
-            tree_model.draw_instanced(static_cast<unsigned int>(tree_matrices.size()));
-            pbr_shader.set_bool("u_instanced", false);
+            glDisable(GL_CULL_FACE);  // Billboards are double-sided
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+            
+            billboard_shader.bind();
+            billboard_shader.bind_uniform_block("CameraData", 0);
+            billboard_shader.bind_uniform_block("SceneData", 1);
+            billboard_shader.set_bool("u_use_texture", false); // Using solid colors
+            
+            tree_billboards.draw();
+            
             glEnable(GL_CULL_FACE);
-            */
 
             // ========================================
             // Render Water
