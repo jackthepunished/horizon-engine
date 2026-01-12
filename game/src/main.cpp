@@ -478,34 +478,35 @@ public:
         HZ_LOG_INFO("Generated {} plant instances", plant_matrices.size());
 
         // ==========================================
-        // Load Tree Model
+        // Load Tree Model (DISABLED - performance issue)
         // ==========================================
+        // TODO: Tree model causes major FPS drops, needs optimization
+        // - Model might be too complex
+        // - Y offset doesn't match terrain (-5 offset)
+        // - Instancing setup might have issues
+        /*
         hz::Model tree_model = hz::Model::load_from_gltf(
             "assets/models/vegetation/island_tree_01/island_tree_01_2k.gltf");
         HZ_LOG_INFO("Loaded tree model (valid={})", tree_model.is_valid());
 
-        // Generate random tree matrices
         const int TREE_COUNT = 10;
         std::vector<glm::mat4> tree_matrices;
         tree_matrices.reserve(TREE_COUNT);
 
-        // Load tree texture
         hz::TextureHandle tree_albedo = assets.load_texture(
             "assets/models/vegetation/island_tree_01/textures/island_tree_01_diff_2k.jpg");
 
-        std::mt19937 tree_rng(9999); // Different seed
+        std::mt19937 tree_rng(9999);
         for (int i = 0; i < TREE_COUNT; ++i) {
             float x = plant_dist_x(tree_rng);
             float z = plant_dist_z(tree_rng);
-            float y = terrain.get_height_at(x, z); // No offset
+            float y = terrain.get_height_at(x, z) - 5.0f; // Match terrain offset
 
-            // Do not spawn trees too close to center (clearance)
             if (x * x + z * z < 100.0f)
                 continue;
 
             glm::mat4 model = glm::translate(glm::mat4(1.0f), glm::vec3(x, y, z));
-            // Trees are big, scale them up!
-            float scale = 3.0f + (static_cast<float>(tree_rng() % 100) / 50.0f); // 3.0 - 5.0 scale
+            float scale = 3.0f + (static_cast<float>(tree_rng() % 100) / 50.0f);
             model = glm::scale(model, glm::vec3(scale));
             float rot = static_cast<float>(tree_rng() % 360);
             model = glm::rotate(model, glm::radians(rot), glm::vec3(0.0f, 1.0f, 0.0f));
@@ -514,6 +515,8 @@ public:
         }
         tree_model.setup_instancing(tree_matrices);
         HZ_LOG_INFO("Generated {} tree instances", tree_matrices.size());
+        */
+        HZ_LOG_INFO("Tree rendering disabled for performance");
 
         // ==========================================
         // Setup Lighting
@@ -1232,23 +1235,21 @@ public:
             glEnable(GL_CULL_FACE);
 
             // ========================================
-            // Render Trees
+            // Render Trees (DISABLED - performance issue)
             // ========================================
-            // Trees have leaves which are double-sided
+            // TODO: Fix tree rendering - Y offset mismatch with terrain
+            // Trees spawn at terrain.get_height_at() but terrain renders at Y-5
+            /*
             glDisable(GL_CULL_FACE);
             pbr_shader.set_bool("u_instanced", true);
-
-            // Bind Tree Textures
             pbr_shader.set_bool("u_use_textures", true);
             if (auto* t = assets.get_texture(tree_albedo)) {
-                t->bind(0); // Albedo at slot 0
+                t->bind(0);
             }
-
-            // Draw Instanced Trees
             tree_model.draw_instanced(static_cast<unsigned int>(tree_matrices.size()));
-
             pbr_shader.set_bool("u_instanced", false);
             glEnable(GL_CULL_FACE);
+            */
 
             // ========================================
             // Render Water
