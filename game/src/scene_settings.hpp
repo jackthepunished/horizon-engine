@@ -16,8 +16,8 @@ struct SceneSettings {
     float sun_intensity = 6.0f;                   // Strong sunlight
 
     // Post Processing
-    float exposure = 1.0f;
-    float bloom_intensity = 0.4f;
+    float exposure = 1.5f;       // Increased for brighter scene
+    float bloom_intensity = 0.3f; // Slightly reduced bloom
     float bloom_threshold = 0.8f;
     bool bloom_enabled = true;
 

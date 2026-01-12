@@ -1449,6 +1449,9 @@ public:
             // 5. Post-Process Pass (HDR + Bloom -> Screen)
             // ========================================
             hdr_shader.bind();
+            hdr_shader.set_float("u_exposure", settings.exposure);
+            hdr_shader.set_float("u_bloom_intensity", settings.bloom_intensity);
+            hdr_shader.set_bool("u_bloom_enabled", settings.bloom_enabled);
             glActiveTexture(GL_TEXTURE0 + 1);
             glBindTexture(GL_TEXTURE_2D, renderer.get_bloom_texture_id());
             renderer.render_post_process(hdr_shader);

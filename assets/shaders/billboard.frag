@@ -20,21 +20,24 @@ void main() {
         discard;
     }
     
-    // Apply instance tint color
+    // Apply instance tint color - preserve original texture colors
     vec3 color = tex_color.rgb * v_color.rgb;
     
-    // Simple lighting from sun
+    // Very subtle lighting - billboards should mostly show their texture
     vec3 light_dir = normalize(-u_sun.direction.xyz);
     float ndotl = max(dot(vec3(0.0, 1.0, 0.0), light_dir), 0.0);
-    float light = 0.4 + 0.6 * ndotl; // Ambient + diffuse
+    float light = 0.7 + 0.3 * ndotl; // High ambient, subtle diffuse
     
-    color *= light * u_sun.color.xyz * u_sun.intensity.x * 0.3;
-    color += u_ambient_light.rgb * 0.5;
+    // Apply gentle lighting without over-darkening
+    color *= light;
     
-    // Distance fog
+    // Add subtle ambient contribution
+    color += u_ambient_light.rgb * 0.15;
+    
+    // Very subtle distance fog for depth
     float dist = length(v_world_pos - u_view_pos.xyz);
-    float fog_factor = 1.0 - exp(-dist * u_fog_density * 0.5);
-    fog_factor = clamp(fog_factor, 0.0, 0.7);
+    float fog_factor = 1.0 - exp(-dist * u_fog_density * 0.3);
+    fog_factor = clamp(fog_factor, 0.0, 0.4); // Max 40% fog
     color = mix(color, u_fog_color.rgb, fog_factor * float(u_fog_enabled));
     
     frag_color = vec4(color, tex_color.a * v_color.a);
