@@ -432,13 +432,13 @@ public:
         // Volumetric fog settings
         struct VolumetricSettings {
             bool enabled = true;
-            float fog_density = 0.015f;
-            float fog_height_falloff = 0.1f;
-            float fog_base_height = 0.0f;
-            glm::vec3 fog_color = glm::vec3(0.7f, 0.8f, 0.95f);
-            float scattering_coeff = 0.5f;
-            float absorption_coeff = 0.02f;
-            float god_ray_intensity = 1.2f;
+            float fog_density = 0.005f;          // Reduced from 0.015 - less dense fog
+            float fog_height_falloff = 0.15f;    // Faster falloff with height
+            float fog_base_height = -5.0f;       // Fog stays lower
+            glm::vec3 fog_color = glm::vec3(0.85f, 0.9f, 1.0f);  // Brighter fog color
+            float scattering_coeff = 0.3f;       // Reduced from 0.5 - less light absorption
+            float absorption_coeff = 0.005f;     // Reduced from 0.02 - less light blocking
+            float god_ray_intensity = 1.5f;      // Increased god rays
             float god_ray_decay = 0.95f;
             int ray_march_steps = 32;
         } volumetric_settings;
@@ -519,11 +519,11 @@ public:
         // Setup Lighting
         // ==========================================
         hz::SceneLighting lighting;
-        // Morning sun: low angle, warm color
-        lighting.sun.direction = glm::normalize(glm::vec3(0.8f, -0.4f, 0.2f));
-        lighting.sun.color = glm::vec3(1.0f, 0.9f, 0.7f);     // Warm morning yellow
-        lighting.sun.intensity = 4.0f;                        // Much brighter
-        lighting.ambient_light = glm::vec3(0.3f, 0.4f, 0.5f); // Sky ambient blue
+        // Bright daylight sun: high angle for better illumination
+        lighting.sun.direction = glm::normalize(glm::vec3(0.5f, -0.8f, 0.3f));  // Higher sun angle
+        lighting.sun.color = glm::vec3(1.0f, 0.95f, 0.85f);   // Bright warm white
+        lighting.sun.intensity = 6.0f;                         // Increased from 4.0
+        lighting.ambient_light = glm::vec3(0.4f, 0.5f, 0.6f);  // Brighter ambient
 
         // Point Light 0 - Warm orange (orbiting)
         lighting.point_lights.push_back({});

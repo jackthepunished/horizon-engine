@@ -218,8 +218,8 @@ void main() {
             vec3 in_scatter = u_light_color * u_light_intensity * phase * 
                              u_scattering_coeff * light_visibility;
             
-            // Add ambient fog color
-            vec3 ambient_fog = u_fog_color * 0.2;
+            // Add ambient fog color (brighter for better visibility)
+            vec3 ambient_fog = u_fog_color * 0.4;
             
             // Total light at this sample
             vec3 sample_light = (in_scatter + ambient_fog) * density;
