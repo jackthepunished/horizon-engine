@@ -11,6 +11,8 @@ I'm learning OpenGL, so this is a work in progress. Planning to migrate (or from
 I'm using this project to learn and experiment with new technologies.
 Strictly keeping up with learnopengl.com
 
+Note: Since I only have M4 Mac Mini, only the OpenGL 4.1 version is supported which is very old. But this situation helps me to understand the inner workings of the graphics pipelines and the depths of the OpenGL, and forces me to write better code (which I'm not there yet.)
+
 ### News (2026-01-11)
 
 **⟳ Migrated to EnTT**: Switched the internal ECS from a custom implementation to [EnTT](https://github.com/skypjack/entt).

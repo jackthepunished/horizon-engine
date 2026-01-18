@@ -88,9 +88,12 @@ public:
     PhysicsBodyID create_dynamic_box(const glm::vec3& position, const glm::vec3& half_extents,
                                      f32 mass = 1.0f);
     PhysicsBodyID create_dynamic_sphere(const glm::vec3& position, f32 radius, f32 mass = 1.0f);
+    PhysicsBodyID create_dynamic_capsule(const glm::vec3& position, f32 half_height, f32 radius,
+                                         f32 mass = 1.0f);
     void remove_body(PhysicsBodyID body_id);
 
     [[nodiscard]] glm::vec3 get_body_position(PhysicsBodyID body_id) const;
+    [[nodiscard]] glm::vec3 get_body_velocity(PhysicsBodyID body_id) const;
     [[nodiscard]] glm::quat get_body_rotation(PhysicsBodyID body_id) const;
     void set_body_position(PhysicsBodyID body_id, const glm::vec3& position);
     void set_body_velocity(PhysicsBodyID body_id, const glm::vec3& velocity);

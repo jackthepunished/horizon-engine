@@ -182,9 +182,9 @@ memory_layout:
   alignment_table:
     scalar: 4
     vec2: 8
-    vec3: 16  # std140, 12 in std430
+    vec3: 16 # std140, 12 in std430
     vec4: 16
-    mat4: 64  # column-major, 4 vec4s
+    mat4: 64 # column-major, 4 vec4s
 
 # ==============================================================================
 # SPIR-V Validation Rules
