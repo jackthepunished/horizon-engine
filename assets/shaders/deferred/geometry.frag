@@ -11,12 +11,14 @@
 layout(location = 0) out vec4 gAlbedoMetallic;
 layout(location = 1) out vec4 gNormalRoughness;
 layout(location = 2) out vec4 gEmissionID;
+layout(location = 3) out vec2 gVelocity;
+layout(location = 4) out float gDepth;
 
 in VS_OUT {
     vec3 FragPos;
     vec3 Normal;
     vec2 TexCoord;
-    vec3 Tangent;
+    vec4 Tangent;
     vec4 ClipPos;
     vec4 PrevClipPos;
 } fs_in;
@@ -56,9 +58,10 @@ vec3 getNormalFromMap() {
     vec3 tangentNormal = texture(u_NormalMap, fs_in.TexCoord).rgb * 2.0 - 1.0;
     
     vec3 N = normalize(fs_in.Normal);
-    vec3 T = normalize(fs_in.Tangent);
+    vec3 T = normalize(fs_in.Tangent.xyz);
     T = normalize(T - dot(T, N) * N);
-    vec3 B = cross(N, T);
+    // Use handedness (w) to flip Bitangent
+    vec3 B = cross(N, T) * fs_in.Tangent.w;
     
     mat3 TBN = mat3(T, B, N);
     return normalize(TBN * tangentNormal);
@@ -77,20 +80,29 @@ void main() {
         normal = getNormalFromMap();
     }
     
-    // Metallic / Roughness (often packed in one texture: R=AO, G=Roughness, B=Metallic)
+    // Metallic / Roughness / AO (packed in ARM texture: R=AO, G=Roughness, B=Metallic)
     float metallic = u_Metallic;
     float roughness = u_Roughness;
-    if (u_UseMetallicRoughnessMap) {
-        vec3 mr = texture(u_MetallicRoughnessMap, fs_in.TexCoord).rgb;
-        metallic = mr.b;
-        roughness = mr.g;
-    }
-    roughness = clamp(roughness, 0.04, 1.0);
-    
-    // AO
     float ao = 1.0;
+    
+    if (u_UseMetallicRoughnessMap) {
+        vec3 arm = texture(u_MetallicRoughnessMap, fs_in.TexCoord).rgb;
+        ao = arm.r;        // AO from red channel
+        roughness = arm.g; // Roughness from green channel
+        metallic = arm.b;  // Metallic from blue channel
+    }
+    
+    // Specular anti-aliasing: increase roughness based on normal variance
+    // This reduces sparkling/shimmering on detailed surfaces
+    vec3 normalDdx = dFdx(normal);
+    vec3 normalDdy = dFdy(normal);
+    float normalVariance = dot(normalDdx, normalDdx) + dot(normalDdy, normalDdy);
+    float kernelRoughness = min(2.0 * normalVariance, 0.18);
+    roughness = clamp(roughness + kernelRoughness, 0.04, 1.0);
+    
+    // Separate AO map (if provided, multiply with ARM's AO)
     if (u_UseAOMap) {
-        ao = texture(u_AOMap, fs_in.TexCoord).r;
+        ao *= texture(u_AOMap, fs_in.TexCoord).r;
     }
     
     // Emission
@@ -106,4 +118,12 @@ void main() {
     gAlbedoMetallic = vec4(albedo, metallic);
     gNormalRoughness = vec4(encodedNormal, roughness, ao);
     gEmissionID = vec4(emission, u_MaterialID);
+    
+    // Store velocity (screen space)
+    vec2 currentPos = (fs_in.ClipPos.xy / fs_in.ClipPos.w) * 0.5 + 0.5;
+    vec2 prevPos = (fs_in.PrevClipPos.xy / fs_in.PrevClipPos.w) * 0.5 + 0.5;
+    gVelocity = currentPos - prevPos;
+
+    // Explicit depth copy to avoid sampler issues
+    gDepth = gl_FragCoord.z;
 }

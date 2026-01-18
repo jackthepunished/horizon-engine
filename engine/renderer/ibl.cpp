@@ -14,69 +14,41 @@ namespace hz {
 
 // Cube vertices for rendering to cubemap faces
 static float s_cube_vertices[] = {
-    // positions          
-    -1.0f,  1.0f, -1.0f,
-    -1.0f, -1.0f, -1.0f,
-     1.0f, -1.0f, -1.0f,
-     1.0f, -1.0f, -1.0f,
-     1.0f,  1.0f, -1.0f,
-    -1.0f,  1.0f, -1.0f,
+    // positions
+    -1.0f, 1.0f,  -1.0f, -1.0f, -1.0f, -1.0f, 1.0f,  -1.0f, -1.0f,
+    1.0f,  -1.0f, -1.0f, 1.0f,  1.0f,  -1.0f, -1.0f, 1.0f,  -1.0f,
 
-    -1.0f, -1.0f,  1.0f,
-    -1.0f, -1.0f, -1.0f,
-    -1.0f,  1.0f, -1.0f,
-    -1.0f,  1.0f, -1.0f,
-    -1.0f,  1.0f,  1.0f,
-    -1.0f, -1.0f,  1.0f,
+    -1.0f, -1.0f, 1.0f,  -1.0f, -1.0f, -1.0f, -1.0f, 1.0f,  -1.0f,
+    -1.0f, 1.0f,  -1.0f, -1.0f, 1.0f,  1.0f,  -1.0f, -1.0f, 1.0f,
 
-     1.0f, -1.0f, -1.0f,
-     1.0f, -1.0f,  1.0f,
-     1.0f,  1.0f,  1.0f,
-     1.0f,  1.0f,  1.0f,
-     1.0f,  1.0f, -1.0f,
-     1.0f, -1.0f, -1.0f,
+    1.0f,  -1.0f, -1.0f, 1.0f,  -1.0f, 1.0f,  1.0f,  1.0f,  1.0f,
+    1.0f,  1.0f,  1.0f,  1.0f,  1.0f,  -1.0f, 1.0f,  -1.0f, -1.0f,
 
-    -1.0f, -1.0f,  1.0f,
-    -1.0f,  1.0f,  1.0f,
-     1.0f,  1.0f,  1.0f,
-     1.0f,  1.0f,  1.0f,
-     1.0f, -1.0f,  1.0f,
-    -1.0f, -1.0f,  1.0f,
+    -1.0f, -1.0f, 1.0f,  -1.0f, 1.0f,  1.0f,  1.0f,  1.0f,  1.0f,
+    1.0f,  1.0f,  1.0f,  1.0f,  -1.0f, 1.0f,  -1.0f, -1.0f, 1.0f,
 
-    -1.0f,  1.0f, -1.0f,
-     1.0f,  1.0f, -1.0f,
-     1.0f,  1.0f,  1.0f,
-     1.0f,  1.0f,  1.0f,
-    -1.0f,  1.0f,  1.0f,
-    -1.0f,  1.0f, -1.0f,
+    -1.0f, 1.0f,  -1.0f, 1.0f,  1.0f,  -1.0f, 1.0f,  1.0f,  1.0f,
+    1.0f,  1.0f,  1.0f,  -1.0f, 1.0f,  1.0f,  -1.0f, 1.0f,  -1.0f,
 
-    -1.0f, -1.0f, -1.0f,
-    -1.0f, -1.0f,  1.0f,
-     1.0f, -1.0f, -1.0f,
-     1.0f, -1.0f, -1.0f,
-    -1.0f, -1.0f,  1.0f,
-     1.0f, -1.0f,  1.0f
-};
+    -1.0f, -1.0f, -1.0f, -1.0f, -1.0f, 1.0f,  1.0f,  -1.0f, -1.0f,
+    1.0f,  -1.0f, -1.0f, -1.0f, -1.0f, 1.0f,  1.0f,  -1.0f, 1.0f};
 
 // Quad vertices for BRDF LUT
 static float s_quad_vertices[] = {
     // positions        // texture coords
-    -1.0f,  1.0f, 0.0f, 0.0f, 1.0f,
-    -1.0f, -1.0f, 0.0f, 0.0f, 0.0f,
-     1.0f,  1.0f, 0.0f, 1.0f, 1.0f,
-     1.0f, -1.0f, 0.0f, 1.0f, 0.0f,
+    -1.0f, 1.0f, 0.0f, 0.0f, 1.0f, -1.0f, -1.0f, 0.0f, 0.0f, 0.0f,
+    1.0f,  1.0f, 0.0f, 1.0f, 1.0f, 1.0f,  -1.0f, 0.0f, 1.0f, 0.0f,
 };
 
 // Capture projection/view matrices for cubemap rendering
 static glm::mat4 s_capture_projection = glm::perspective(glm::radians(90.0f), 1.0f, 0.1f, 10.0f);
 static glm::mat4 s_capture_views[] = {
-    glm::lookAt(glm::vec3(0.0f), glm::vec3( 1.0f,  0.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
-    glm::lookAt(glm::vec3(0.0f), glm::vec3(-1.0f,  0.0f,  0.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
-    glm::lookAt(glm::vec3(0.0f), glm::vec3( 0.0f,  1.0f,  0.0f), glm::vec3(0.0f,  0.0f,  1.0f)),
-    glm::lookAt(glm::vec3(0.0f), glm::vec3( 0.0f, -1.0f,  0.0f), glm::vec3(0.0f,  0.0f, -1.0f)),
-    glm::lookAt(glm::vec3(0.0f), glm::vec3( 0.0f,  0.0f,  1.0f), glm::vec3(0.0f, -1.0f,  0.0f)),
-    glm::lookAt(glm::vec3(0.0f), glm::vec3( 0.0f,  0.0f, -1.0f), glm::vec3(0.0f, -1.0f,  0.0f))
-};
+    glm::lookAt(glm::vec3(0.0f), glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f)),
+    glm::lookAt(glm::vec3(0.0f), glm::vec3(-1.0f, 0.0f, 0.0f), glm::vec3(0.0f, -1.0f, 0.0f)),
+    glm::lookAt(glm::vec3(0.0f), glm::vec3(0.0f, 1.0f, 0.0f), glm::vec3(0.0f, 0.0f, 1.0f)),
+    glm::lookAt(glm::vec3(0.0f), glm::vec3(0.0f, -1.0f, 0.0f), glm::vec3(0.0f, 0.0f, -1.0f)),
+    glm::lookAt(glm::vec3(0.0f), glm::vec3(0.0f, 0.0f, 1.0f), glm::vec3(0.0f, -1.0f, 0.0f)),
+    glm::lookAt(glm::vec3(0.0f), glm::vec3(0.0f, 0.0f, -1.0f), glm::vec3(0.0f, -1.0f, 0.0f))};
 
 static std::string read_shader_file(const std::string& path) {
     std::ifstream file(path);
@@ -92,17 +64,28 @@ static std::string read_shader_file(const std::string& path) {
 IBL::IBL() = default;
 
 IBL::~IBL() noexcept {
-    if (m_capture_fbo) glDeleteFramebuffers(1, &m_capture_fbo);
-    if (m_capture_rbo) glDeleteRenderbuffers(1, &m_capture_rbo);
-    if (m_hdr_texture) glDeleteTextures(1, &m_hdr_texture);
-    if (m_env_cubemap) glDeleteTextures(1, &m_env_cubemap);
-    if (m_irradiance_map) glDeleteTextures(1, &m_irradiance_map);
-    if (m_prefilter_map) glDeleteTextures(1, &m_prefilter_map);
-    if (m_brdf_lut) glDeleteTextures(1, &m_brdf_lut);
-    if (m_cube_vao) glDeleteVertexArrays(1, &m_cube_vao);
-    if (m_cube_vbo) glDeleteBuffers(1, &m_cube_vbo);
-    if (m_quad_vao) glDeleteVertexArrays(1, &m_quad_vao);
-    if (m_quad_vbo) glDeleteBuffers(1, &m_quad_vbo);
+    if (m_capture_fbo)
+        glDeleteFramebuffers(1, &m_capture_fbo);
+    if (m_capture_rbo)
+        glDeleteRenderbuffers(1, &m_capture_rbo);
+    if (m_hdr_texture)
+        glDeleteTextures(1, &m_hdr_texture);
+    if (m_env_cubemap)
+        glDeleteTextures(1, &m_env_cubemap);
+    if (m_irradiance_map)
+        glDeleteTextures(1, &m_irradiance_map);
+    if (m_prefilter_map)
+        glDeleteTextures(1, &m_prefilter_map);
+    if (m_brdf_lut)
+        glDeleteTextures(1, &m_brdf_lut);
+    if (m_cube_vao)
+        glDeleteVertexArrays(1, &m_cube_vao);
+    if (m_cube_vbo)
+        glDeleteBuffers(1, &m_cube_vbo);
+    if (m_quad_vao)
+        glDeleteVertexArrays(1, &m_quad_vao);
+    if (m_quad_vbo)
+        glDeleteBuffers(1, &m_quad_vbo);
 }
 
 bool IBL::generate(const std::string& hdr_path, u32 cubemap_size) {
@@ -127,7 +110,8 @@ bool IBL::generate(const std::string& hdr_path, u32 cubemap_size) {
 }
 
 void IBL::bind(u32 irradiance_slot, u32 prefilter_slot, u32 brdf_slot) const {
-    if (!m_ready) return;
+    if (!m_ready)
+        return;
 
     glActiveTexture(GL_TEXTURE0 + irradiance_slot);
     glBindTexture(GL_TEXTURE_CUBE_MAP, m_irradiance_map);
@@ -196,13 +180,15 @@ void IBL::load_hdr_texture(const std::string& path) {
 
 void IBL::create_environment_cubemap(u32 size) {
     // Create environment cubemap
+    glDisable(GL_CULL_FACE);
+    glDisable(GL_DEPTH_TEST);
+
     glGenTextures(1, &m_env_cubemap);
     glBindTexture(GL_TEXTURE_CUBE_MAP, m_env_cubemap);
 
     for (u32 i = 0; i < 6; ++i) {
-        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, 
-                     static_cast<GLsizei>(size), static_cast<GLsizei>(size), 
-                     0, GL_RGB, GL_FLOAT, nullptr);
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, static_cast<GLsizei>(size),
+                     static_cast<GLsizei>(size), 0, GL_RGB, GL_FLOAT, nullptr);
     }
 
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -244,14 +230,18 @@ void IBL::create_environment_cubemap(u32 size) {
 }
 
 void IBL::create_irradiance_map() {
-    const u32 irradiance_size = 32;
+    // Higher irradiance resolution reduces blocky diffuse ambient
+    const u32 irradiance_size = 64;
+
+    glDisable(GL_CULL_FACE);
+    glDisable(GL_DEPTH_TEST);
 
     glGenTextures(1, &m_irradiance_map);
     glBindTexture(GL_TEXTURE_CUBE_MAP, m_irradiance_map);
 
     for (u32 i = 0; i < 6; ++i) {
-        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F,
-                     irradiance_size, irradiance_size, 0, GL_RGB, GL_FLOAT, nullptr);
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, irradiance_size,
+                     irradiance_size, 0, GL_RGB, GL_FLOAT, nullptr);
     }
 
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -288,15 +278,21 @@ void IBL::create_irradiance_map() {
 }
 
 void IBL::create_prefilter_map(u32 size) {
-    const u32 prefilter_size = 128;
-    const u32 max_mip_levels = 5;
+    // Prefilter resolution heavily affects reflection smoothness.
+    // Tie it to the environment cubemap size (passed in), but keep it bounded.
+    const u32 prefilter_size = std::max<u32>(128, std::min<u32>(512, size / 4));
+    // Use more mips for smoother roughness transitions.
+    const u32 max_mip_levels = 6;
+
+    glDisable(GL_CULL_FACE);
+    glDisable(GL_DEPTH_TEST);
 
     glGenTextures(1, &m_prefilter_map);
     glBindTexture(GL_TEXTURE_CUBE_MAP, m_prefilter_map);
 
     for (u32 i = 0; i < 6; ++i) {
-        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F,
-                     prefilter_size, prefilter_size, 0, GL_RGB, GL_FLOAT, nullptr);
+        glTexImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, 0, GL_RGB16F, prefilter_size,
+                     prefilter_size, 0, GL_RGB, GL_FLOAT, nullptr);
     }
 
     glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -324,9 +320,9 @@ void IBL::create_prefilter_map(u32 size) {
         // Resize framebuffer according to mip level
         u32 mip_width = static_cast<u32>(prefilter_size * std::pow(0.5, mip));
         u32 mip_height = mip_width;
-        
+
         glBindRenderbuffer(GL_RENDERBUFFER, m_capture_rbo);
-        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, 
+        glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24,
                               static_cast<GLsizei>(mip_width), static_cast<GLsizei>(mip_height));
         glViewport(0, 0, static_cast<GLsizei>(mip_width), static_cast<GLsizei>(mip_height));
 
@@ -336,7 +332,7 @@ void IBL::create_prefilter_map(u32 size) {
         for (u32 i = 0; i < 6; ++i) {
             prefilter_shader.set_mat4("u_view", s_capture_views[i]);
             glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
-                                   GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, m_prefilter_map, 
+                                   GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, m_prefilter_map,
                                    static_cast<GLint>(mip));
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
             render_cube();
@@ -344,11 +340,15 @@ void IBL::create_prefilter_map(u32 size) {
     }
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
-    HZ_ENGINE_INFO("Created prefilter map: {}x{} with {} mip levels", prefilter_size, prefilter_size, max_mip_levels);
+    HZ_ENGINE_INFO("Created prefilter map: {}x{} with {} mip levels", prefilter_size,
+                   prefilter_size, max_mip_levels);
 }
 
 void IBL::create_brdf_lut() {
     const u32 lut_size = 512;
+
+    glDisable(GL_CULL_FACE);
+    glDisable(GL_DEPTH_TEST);
 
     glGenTextures(1, &m_brdf_lut);
     glBindTexture(GL_TEXTURE_2D, m_brdf_lut);

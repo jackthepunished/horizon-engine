@@ -24,7 +24,7 @@ struct Vertex {
     glm::vec3 position;
     glm::vec3 normal;
     glm::vec2 texcoord;
-    glm::vec3 tangent; // For normal mapping (TBN matrix)
+    glm::vec4 tangent; // For normal mapping (TBN matrix) + Handedness
 
     // Skeletal animation data
     int bone_ids[MAX_BONE_INFLUENCE] = {-1, -1, -1, -1};

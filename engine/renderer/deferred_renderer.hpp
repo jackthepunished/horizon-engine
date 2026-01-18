@@ -45,7 +45,9 @@ enum GBufferTarget : u32 {
     GBUFFER_ALBEDO_METALLIC = 0,  // RGBA16F: RGB=Albedo, A=Metallic
     GBUFFER_NORMAL_ROUGHNESS = 1, // RGBA16F: RG=Normal, B=Roughness, A=AO
     GBUFFER_EMISSION_ID = 2,      // RGBA16F: RGB=Emission, A=Material ID
-    GBUFFER_COUNT = 3
+    GBUFFER_VELOCITY = 3,         // RG16F: RG=Velocity
+    GBUFFER_DEPTH_COPY = 4,       // R32F: Explicit depth copy to avoid sampler issues
+    GBUFFER_COUNT = 5
 };
 
 /**
@@ -159,10 +161,11 @@ struct SSRPass {
  * @brief TAA configuration
  */
 struct TAAConfig {
-    f32 feedback_min{0.88f};
-    f32 feedback_max{0.97f};
-    bool enabled{true};
-    bool use_motion_vectors{true};
+    f32 feedback_min{0.75f};        // Lower = less blur, more responsive
+    f32 feedback_max{0.90f};        // Reduced from 0.97 to reduce motion blur
+    f32 jitter_scale{1.0f};         // Jitter intensity
+    bool enabled{false};            // Disabled by default until TAA pass is properly called
+    bool use_motion_vectors{false}; // Not implemented yet
 };
 
 /**
@@ -291,6 +294,17 @@ public:
     void render_shadows(const glm::vec3& light_direction);
 
     /**
+     * @brief Begin shadow map pass (bind shadow FBO)
+     * Caller should render depth-only geometry with a shadow shader.
+     */
+    void begin_shadow_pass(const glm::mat4& light_space_matrix);
+
+    /**
+     * @brief End shadow map pass (unbind shadow FBO and restore viewport)
+     */
+    void end_shadow_pass();
+
+    /**
      * @brief Execute lighting pass
      * @param camera Current camera
      * @param point_lights Active point lights
@@ -300,7 +314,9 @@ public:
      */
     void execute_lighting_pass(const Camera& camera, const std::vector<GPUPointLight>& point_lights,
                                const std::vector<GPUSpotLight>& spot_lights,
-                               const glm::vec3& sun_direction, const glm::vec3& sun_color);
+                               const glm::vec3& sun_direction, const glm::vec3& sun_color,
+                               u32 irradiance_map = 0, u32 prefilter_map = 0, u32 brdf_lut = 0,
+                               u32 environment_map = 0);
 
     /**
      * @brief Execute SSR pass
@@ -312,6 +328,14 @@ public:
      * @brief Execute TAA pass
      */
     void execute_taa_pass();
+
+    /**
+     * @brief Get jittered projection matrix for current TAA sample
+     * Use this for the geometry pass projection when TAA is enabled.
+     */
+    [[nodiscard]] glm::mat4 get_taa_jittered_projection(const glm::mat4& proj) const {
+        return m_taa.config.enabled ? m_taa.get_jittered_projection(proj) : proj;
+    }
 
     /**
      * @brief Execute full post-processing chain
@@ -419,6 +443,9 @@ private:
 
     // Frustum planes
     std::array<glm::vec4, 6> m_frustum_planes;
+
+    // Shadow state (single directional shadow map for now)
+    glm::mat4 m_light_space_matrix{1.0f};
 
     // Stats
     RenderStats m_stats;

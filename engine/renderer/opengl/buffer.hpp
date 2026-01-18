@@ -22,7 +22,19 @@ public:
     ~VertexArray() noexcept;
 
     HZ_NON_COPYABLE(VertexArray);
-    HZ_DEFAULT_MOVABLE(VertexArray);
+
+    // Custom move operations to properly handle OpenGL resources
+    VertexArray(VertexArray&& other) noexcept : m_vao(other.m_vao) {
+        other.m_vao = 0;  // Prevent source from deleting the handle
+    }
+    VertexArray& operator=(VertexArray&& other) noexcept {
+        if (this != &other) {
+            if (m_vao != 0) glDeleteVertexArrays(1, &m_vao);
+            m_vao = other.m_vao;
+            other.m_vao = 0;
+        }
+        return *this;
+    }
 
     void bind() const;
     static void unbind();
@@ -51,7 +63,22 @@ public:
     ~VertexBuffer() noexcept;
 
     HZ_NON_COPYABLE(VertexBuffer);
-    HZ_DEFAULT_MOVABLE(VertexBuffer);
+
+    // Custom move operations to properly handle OpenGL resources
+    VertexBuffer(VertexBuffer&& other) noexcept : m_vbo(other.m_vbo), m_size(other.m_size) {
+        other.m_vbo = 0;
+        other.m_size = 0;
+    }
+    VertexBuffer& operator=(VertexBuffer&& other) noexcept {
+        if (this != &other) {
+            if (m_vbo != 0) glDeleteBuffers(1, &m_vbo);
+            m_vbo = other.m_vbo;
+            m_size = other.m_size;
+            other.m_vbo = 0;
+            other.m_size = 0;
+        }
+        return *this;
+    }
 
     void bind() const;
     static void unbind();
@@ -88,7 +115,22 @@ public:
     ~IndexBuffer() noexcept;
 
     HZ_NON_COPYABLE(IndexBuffer);
-    HZ_DEFAULT_MOVABLE(IndexBuffer);
+
+    // Custom move operations to properly handle OpenGL resources
+    IndexBuffer(IndexBuffer&& other) noexcept : m_ebo(other.m_ebo), m_count(other.m_count) {
+        other.m_ebo = 0;
+        other.m_count = 0;
+    }
+    IndexBuffer& operator=(IndexBuffer&& other) noexcept {
+        if (this != &other) {
+            if (m_ebo != 0) glDeleteBuffers(1, &m_ebo);
+            m_ebo = other.m_ebo;
+            m_count = other.m_count;
+            other.m_ebo = 0;
+            other.m_count = 0;
+        }
+        return *this;
+    }
 
     void bind() const;
     static void unbind();

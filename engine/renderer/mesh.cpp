@@ -40,7 +40,7 @@ Mesh::Mesh(std::vector<Vertex> vertices, std::vector<u32> indices) {
 
     // Tangent attribute (location 3) - for normal mapping
     gl::set_vertex_attrib({.index = 3,
-                           .size = 3,
+                           .size = 4, // vec4 now
                            .type = GL_FLOAT,
                            .normalized = false,
                            .stride = sizeof(Vertex),
@@ -66,6 +66,14 @@ Mesh::Mesh(std::vector<Vertex> vertices, std::vector<u32> indices) {
 
 void Mesh::draw() const {
     m_vao.bind();
+    // Debug log for character draw (usually index count > 1000 for char)
+    if (m_index_count > 0 &&
+        m_index_count < 100000) { // arbitrary filter to avoid spamming too much if many objects
+        // HZ_ENGINE_INFO("Mesh::draw() called with {} indices", m_index_count);
+    }
+    if (m_index_count == 0) {
+        HZ_ENGINE_WARN("Mesh::draw() called with 0 indices!");
+    }
     glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(m_index_count), GL_UNSIGNED_INT, nullptr);
 }
 
@@ -87,7 +95,9 @@ Mesh Mesh::create_plane(f32 size, i32 subdivisions) {
             v.position = {px, 0.0f, pz};
             v.normal = {0.0f, 1.0f, 0.0f};
             v.texcoord = {static_cast<f32>(x), static_cast<f32>(z)};
-            v.tangent = {1.0f, 0.0f, 0.0f};
+            v.normal = {0.0f, 1.0f, 0.0f};
+            v.texcoord = {static_cast<f32>(x), static_cast<f32>(z)};
+            v.tangent = {1.0f, 0.0f, 0.0f, 1.0f}; // w=1.0 default
             // Explicitly init bone data
             for (int k = 0; k < 4; k++) {
                 v.bone_ids[k] = -1;
@@ -131,7 +141,7 @@ Mesh Mesh::create_cube(f32 size) {
         v.position = p;
         v.normal = n;
         v.texcoord = uv;
-        v.tangent = t;
+        v.tangent = glm::vec4(t, 1.0f); // w=1.0 default
         for (int k = 0; k < 4; k++) {
             v.bone_ids[k] = -1;
             v.bone_weights[k] = 0.0f;
@@ -215,7 +225,9 @@ Mesh Mesh::create_sphere(f32 radius, i32 slices, i32 stacks) {
             // Tangent calculation for sphere
             // Tangent is perpendicular to normal and up (0,1,0), or derived from theta derivative
             // Simple approximation: -sin(theta), 0, cos(theta)
-            glm::vec3 tangent = glm::normalize(glm::vec3(-sin(theta), 0.0f, cos(theta)));
+            // Simple approximation: -sin(theta), 0, cos(theta)
+            glm::vec3 t = glm::normalize(glm::vec3(-sin(theta), 0.0f, cos(theta)));
+            glm::vec4 tangent = glm::vec4(t, 1.0f);
 
             vertices.push_back({pos, normal, texcoord, tangent});
         }

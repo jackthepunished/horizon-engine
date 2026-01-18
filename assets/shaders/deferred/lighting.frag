@@ -8,7 +8,7 @@
 
 out vec4 FragColor;
 
-in vec2 TexCoord;
+in vec2 v_TexCoord;
 
 // G-Buffer textures
 uniform sampler2D gAlbedoMetallic;
@@ -16,21 +16,18 @@ uniform sampler2D gNormalRoughness;
 uniform sampler2D gEmissionID;
 uniform sampler2D gDepth;
 
-// Shadow map (texture array for CSM)
-uniform sampler2DArrayShadow shadowMap;
+// Shadow map (single 2D texture - CSM not fully implemented yet)
+uniform sampler2D shadowMap;
+
+// Single directional light shadow matrix
+uniform mat4 u_LightSpaceMatrix;
 
 // Camera
 uniform mat4 u_InverseView;
 uniform mat4 u_InverseProjection;
 uniform vec3 u_ViewPos;
 
-// CSM data
-#define MAX_CASCADES 4
-uniform int u_CascadeCount;
-uniform float u_CascadeSplits[MAX_CASCADES];
-uniform mat4 u_LightSpaceMatrices[MAX_CASCADES];
 uniform float u_ShadowBias;
-uniform float u_CascadeBlendDistance;
 
 // Sun light
 uniform vec3 u_SunDirection;
@@ -56,10 +53,14 @@ uniform samplerCube u_IrradianceMap;
 uniform samplerCube u_PrefilteredMap;
 uniform sampler2D u_BRDFLUT;
 uniform float u_IBLIntensity;
+uniform float u_SpecularIBLIntensity;
 
 // SSAO
 uniform sampler2D u_SSAOTexture;
 uniform bool u_UseSSAO;
+
+// Background skybox (environment cubemap)
+uniform samplerCube u_Skybox;
 
 const float PI = 3.14159265359;
 
@@ -112,67 +113,32 @@ vec3 fresnelSchlickRoughness(float cosTheta, vec3 F0, float roughness) {
     return F0 + (max(vec3(1.0 - roughness), F0) - F0) * pow(clamp(1.0 - cosTheta, 0.0, 1.0), 5.0);
 }
 
-// CSM shadow calculation
+// Simple shadow calculation (CSM not fully implemented yet)
 float calculateShadow(vec3 worldPos, vec3 N) {
-    // Find which cascade to use
-    vec4 viewPos = u_InverseView * vec4(worldPos - u_ViewPos, 0.0);
-    float depth = -viewPos.z;
-    
-    int cascade = u_CascadeCount - 1;
-    for (int i = 0; i < u_CascadeCount; ++i) {
-        if (depth < u_CascadeSplits[i]) {
-            cascade = i;
-            break;
-        }
-    }
-    
-    // Project to light space
-    vec4 lightSpacePos = u_LightSpaceMatrices[cascade] * vec4(worldPos, 1.0);
+    vec4 lightSpacePos = u_LightSpaceMatrix * vec4(worldPos, 1.0);
     vec3 projCoords = lightSpacePos.xyz / lightSpacePos.w;
     projCoords = projCoords * 0.5 + 0.5;
-    
+
+    // outside light frustum or outside shadow map
     if (projCoords.z > 1.0) return 0.0;
-    
-    // Bias based on surface angle
-    float bias = max(u_ShadowBias * (1.0 - dot(N, -u_SunDirection)), u_ShadowBias * 0.1);
-    float currentDepth = projCoords.z - bias;
-    
-    // PCF sampling
+    if (projCoords.x < 0.0 || projCoords.x > 1.0 || projCoords.y < 0.0 || projCoords.y > 1.0)
+        return 0.0;
+
+    float bias = max(u_ShadowBias * (1.0 - dot(N, normalize(-u_SunDirection))), u_ShadowBias * 0.25);
+
+    // PCF 3x3
     float shadow = 0.0;
-    vec2 texelSize = 1.0 / vec2(textureSize(shadowMap, 0).xy);
+    vec2 texelSize = 1.0 / vec2(textureSize(shadowMap, 0));
+    float currentDepth = projCoords.z - bias;
     for (int x = -1; x <= 1; ++x) {
         for (int y = -1; y <= 1; ++y) {
-            vec2 offset = vec2(x, y) * texelSize;
-            // Use shadow sampler for hardware comparison
-            shadow += texture(shadowMap, vec4(projCoords.xy + offset, float(cascade), currentDepth));
+            float pcfDepth = texture(shadowMap, projCoords.xy + vec2(x, y) * texelSize).r;
+            shadow += currentDepth > pcfDepth ? 1.0 : 0.0;
         }
     }
     shadow /= 9.0;
-    
-    // Cascade blending
-    if (cascade < u_CascadeCount - 1) {
-        float fade = clamp((u_CascadeSplits[cascade] - depth) / u_CascadeBlendDistance, 0.0, 1.0);
-        if (fade < 1.0) {
-            // Sample next cascade
-            vec4 nextLightSpacePos = u_LightSpaceMatrices[cascade + 1] * vec4(worldPos, 1.0);
-            vec3 nextProjCoords = nextLightSpacePos.xyz / nextLightSpacePos.w;
-            nextProjCoords = nextProjCoords * 0.5 + 0.5;
-            float nextCurrentDepth = nextProjCoords.z - bias;
-            
-            float nextShadow = 0.0;
-            for (int x = -1; x <= 1; ++x) {
-                for (int y = -1; y <= 1; ++y) {
-                    vec2 offset = vec2(x, y) * texelSize;
-                    nextShadow += texture(shadowMap, vec4(nextProjCoords.xy + offset, float(cascade + 1), nextCurrentDepth));
-                }
-            }
-            nextShadow /= 9.0;
-            
-            shadow = mix(nextShadow, shadow, fade);
-        }
-    }
-    
-    return 1.0 - shadow;
+
+    return shadow;
 }
 
 // Calculate lighting contribution
@@ -283,33 +249,53 @@ vec3 calculateLighting(vec3 worldPos, vec3 N, vec3 V, vec3 albedo, float metalli
     vec3 irradiance = texture(u_IrradianceMap, N).rgb;
     vec3 diffuse = irradiance * albedo;
     
-    const float MAX_REFLECTION_LOD = 4.0;
+    // Must match (max_mip_levels - 1) in IBL prefilter generation
+    const float MAX_REFLECTION_LOD = 5.0;
     vec3 R = reflect(-V, N);
     vec3 prefilteredColor = textureLod(u_PrefilteredMap, R, roughness * MAX_REFLECTION_LOD).rgb;
     vec2 brdf = texture(u_BRDFLUT, vec2(max(dot(N, V), 0.0), roughness)).rg;
     vec3 specular = prefilteredColor * (F * brdf.x + brdf.y);
     
-    vec3 ambient = (kD * diffuse + specular) * ao * u_IBLIntensity;
+    // Split diffuse/specular IBL so reflections don't overpower the material
+    vec3 ambient = (kD * diffuse * u_IBLIntensity + specular * u_SpecularIBLIntensity) * ao;
     
+    // Safety fallback: prevents pitch black shadows if IBL is black/missing
+    ambient += vec3(0.02) * albedo * ao;
+
     // Apply SSAO
     if (u_UseSSAO) {
-        float ssao = texture(u_SSAOTexture, TexCoord).r;
+        float ssao = texture(u_SSAOTexture, v_TexCoord).r;
         ambient *= ssao;
     }
+    
+    // Debug Mode (Uniform must be added if not present, but for now hardcode check or assume user adds uniform if they want)
+    // Actually, I'll just add the fallback for now. Adding a Uniform requires C++ changes which might conflicts with Reset.
+    // User requested "continue from here". The fallback is the critical visual fix.
+    
+    // NOTE: u_DebugMode is NOT in the shader uniformly currently (checked file content).
+    // I will NOT add DebugMode to shader inputs to avoid breaking C++ uniform mapping contract if I can't update C++.
+    // But I CAN add the fallback.
+
     
     return ambient + Lo;
 }
 
 void main() {
     // Sample G-Buffer
-    vec4 albedoMetallic = texture(gAlbedoMetallic, TexCoord);
-    vec4 normalRoughness = texture(gNormalRoughness, TexCoord);
-    vec4 emissionID = texture(gEmissionID, TexCoord);
-    float depth = texture(gDepth, TexCoord).r;
+    vec4 albedoMetallic = texture(gAlbedoMetallic, v_TexCoord);
+    vec4 normalRoughness = texture(gNormalRoughness, v_TexCoord);
+    vec4 emissionID = texture(gEmissionID, v_TexCoord);
+    float depth = texture(gDepth, v_TexCoord).r;
     
     // Early out for sky
     if (depth >= 1.0) {
-        FragColor = vec4(0.0);
+        // Reconstruct a world-space view ray and sample skybox
+        vec4 clip = vec4(v_TexCoord * 2.0 - 1.0, 1.0, 1.0);
+        vec4 viewDir4 = u_InverseProjection * clip;
+        vec3 viewDir = normalize(viewDir4.xyz / max(viewDir4.w, 0.0001));
+        vec3 worldDir = normalize(mat3(u_InverseView) * viewDir);
+        vec3 sky = texture(u_Skybox, worldDir).rgb;
+        FragColor = vec4(sky, 1.0);
         return;
     }
     
@@ -322,7 +308,7 @@ void main() {
     vec3 emission = emissionID.rgb;
     
     // Reconstruct world position
-    vec3 worldPos = reconstructWorldPos(TexCoord, depth);
+    vec3 worldPos = reconstructWorldPos(v_TexCoord, depth);
     vec3 V = normalize(u_ViewPos - worldPos);
     
     // Calculate lighting
