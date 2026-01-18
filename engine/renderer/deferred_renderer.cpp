@@ -1,15 +1,29 @@
 #include "deferred_renderer.hpp"
 
+#include "engine/assets/asset_registry.hpp"
 #include "engine/core/log.hpp"
 #include "engine/renderer/opengl/gl_context.hpp"
 
 #include <cmath>
+#include <fstream>
+#include <sstream>
 
 namespace hz {
 
 // ============================================================================
 // GBuffer Implementation
 // ============================================================================
+
+static std::string read_shader_file(const std::string& path) {
+    std::ifstream in(path, std::ios::in | std::ios::binary);
+    if (!in) {
+        HZ_ENGINE_ERROR("Could not open shader file: {}", path);
+        return "";
+    }
+    std::stringstream buffer;
+    buffer << in.rdbuf();
+    return buffer.str();
+}
 
 void GBuffer::create(u32 w, u32 h) {
     width = w;
@@ -23,8 +37,20 @@ void GBuffer::create(u32 w, u32 h) {
 
     for (u32 i = 0; i < GBUFFER_COUNT; ++i) {
         glBindTexture(GL_TEXTURE_2D, color_textures[i]);
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, static_cast<GLsizei>(width),
-                     static_cast<GLsizei>(height), 0, GL_RGBA, GL_FLOAT, nullptr);
+
+        GLint internal_format = GL_RGBA16F;
+        GLenum format = GL_RGBA;
+
+        if (i == GBUFFER_VELOCITY) {
+            internal_format = GL_RG16F;
+            format = GL_RG;
+        } else if (i == GBUFFER_DEPTH_COPY) {
+            internal_format = GL_R32F;
+            format = GL_RED;
+        }
+
+        glTexImage2D(GL_TEXTURE_2D, 0, internal_format, static_cast<GLsizei>(width),
+                     static_cast<GLsizei>(height), 0, format, GL_FLOAT, nullptr);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -36,7 +62,7 @@ void GBuffer::create(u32 w, u32 h) {
     // Create depth texture
     glGenTextures(1, &depth_texture);
     glBindTexture(GL_TEXTURE_2D, depth_texture);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32F, static_cast<GLsizei>(width),
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT24, static_cast<GLsizei>(width),
                  static_cast<GLsizei>(height), 0, GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
@@ -44,12 +70,11 @@ void GBuffer::create(u32 w, u32 h) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depth_texture, 0);
 
-    // Set draw buffers for MRT - OpenGL 4.1 compatible
-    GLenum attachments[GBUFFER_COUNT] = {GL_COLOR_ATTACHMENT0};
-    // For OpenGL 4.1, iterate and set individually if glDrawBuffers not available
-    // But OpenGL 4.1 DOES have glDrawBuffers - we need to update GLAD
-    // For now, use single buffer approach
-    glDrawBuffer(GL_COLOR_ATTACHMENT0);
+    // Set draw buffers for MRT
+    GLenum attachments[GBUFFER_COUNT] = {GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1,
+                                         GL_COLOR_ATTACHMENT2, GL_COLOR_ATTACHMENT3,
+                                         GL_COLOR_ATTACHMENT4};
+    glDrawBuffers(GBUFFER_COUNT, attachments);
 
     // Check completeness
     if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
@@ -301,6 +326,8 @@ void TAAPass::create(u32 w, u32 h, const TAAConfig& cfg) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, current_texture, 0);
+    glDrawBuffer(GL_COLOR_ATTACHMENT0);
+    glReadBuffer(GL_COLOR_ATTACHMENT0);
 
     // History texture
     glGenTextures(1, &history_texture);
@@ -437,6 +464,11 @@ bool DeferredRenderer::init(u32 width, u32 height) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_lighting_texture,
                            0);
+    glDrawBuffer(GL_COLOR_ATTACHMENT0);
+    glReadBuffer(GL_COLOR_ATTACHMENT0);
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+        HZ_ENGINE_ERROR("Lighting framebuffer incomplete!");
+    }
 
     // Create bloom FBOs (ping-pong)
     glGenFramebuffers(1, &m_bloom_fbo);
@@ -450,6 +482,11 @@ bool DeferredRenderer::init(u32 width, u32 height) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_bloom_texture, 0);
+    glDrawBuffer(GL_COLOR_ATTACHMENT0);
+    glReadBuffer(GL_COLOR_ATTACHMENT0);
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+        HZ_ENGINE_ERROR("Bloom framebuffer incomplete!");
+    }
 
     // Blur ping-pong
     glGenFramebuffers(2, m_blur_fbos.data());
@@ -465,6 +502,11 @@ bool DeferredRenderer::init(u32 width, u32 height) {
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D,
                                m_blur_textures[i], 0);
+        glDrawBuffer(GL_COLOR_ATTACHMENT0);
+        glReadBuffer(GL_COLOR_ATTACHMENT0);
+        if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+            HZ_ENGINE_ERROR("Blur framebuffer {} incomplete!", i);
+        }
     }
 
     // Final output FBO
@@ -477,11 +519,80 @@ bool DeferredRenderer::init(u32 width, u32 height) {
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, m_final_texture, 0);
+    glDrawBuffer(GL_COLOR_ATTACHMENT0);
+    glReadBuffer(GL_COLOR_ATTACHMENT0);
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE) {
+        HZ_ENGINE_ERROR("Final framebuffer incomplete!");
+    }
 
     glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
     // Create fullscreen quad
     create_fullscreen_quad();
+
+    // Lighting Pass
+    try {
+        std::string quad_vert = read_shader_file("assets/shaders/deferred/fullscreen.vert");
+        std::string light_frag = read_shader_file("assets/shaders/deferred/lighting.frag");
+        if (!quad_vert.empty() && !light_frag.empty()) {
+            m_lighting_shader = std::make_unique<gl::Shader>(quad_vert, light_frag);
+            m_lighting_shader->bind();
+            m_lighting_shader->set_int("gAlbedoMetallic", 0);
+            m_lighting_shader->set_int("gNormalRoughness", 1);
+            m_lighting_shader->set_int("gEmissionID", 2);
+            m_lighting_shader->set_int("gDepth", 3);
+            m_lighting_shader->set_int("shadowMap", 4); // Array
+            // IBL textures (start after shadow map)
+            // Assuming texture array binds to 4 (CSM)
+            m_lighting_shader->set_int("u_IrradianceMap", 5);
+            m_lighting_shader->set_int("u_PrefilteredMap", 6);
+            m_lighting_shader->set_int("u_BRDFLUT", 7);
+            m_lighting_shader->set_int("u_SSAOTexture", 8);
+            m_lighting_shader->set_int("u_Skybox", 9);
+        } else {
+            HZ_ENGINE_ERROR("Failed to read lighting shader files");
+            return false;
+        }
+    } catch (const std::exception& e) {
+        HZ_ENGINE_ERROR("Failed to load lighting shader: {}", e.what());
+        return false;
+    }
+
+    // TAA Pass
+    try {
+        std::string quad_vert = read_shader_file("assets/shaders/deferred/fullscreen.vert");
+        std::string taa_frag = read_shader_file("assets/shaders/deferred/taa.frag");
+        if (!quad_vert.empty() && !taa_frag.empty()) {
+            m_taa_shader = std::make_unique<gl::Shader>(quad_vert, taa_frag);
+            m_taa_shader->bind();
+            m_taa_shader->set_int("u_Current", 0);
+            m_taa_shader->set_int("u_History", 1);
+        } else {
+            HZ_ENGINE_WARN("TAA shader files not found - TAA disabled");
+            // TAA is optional, don't fail initialization
+        }
+    } catch (const std::exception& e) {
+        HZ_ENGINE_WARN("Failed to load TAA shader: {} - TAA disabled", e.what());
+        // TAA is optional, don't fail initialization
+    }
+
+    // Composite Pass
+    try {
+        std::string quad_vert = read_shader_file("assets/shaders/deferred/fullscreen.vert");
+        std::string comp_frag = read_shader_file("assets/shaders/deferred/composite.frag");
+        if (!quad_vert.empty() && !comp_frag.empty()) {
+            m_composite_shader = std::make_unique<gl::Shader>(quad_vert, comp_frag);
+            m_composite_shader->bind();
+            m_composite_shader->set_int("u_HDRBuffer", 0);
+            m_composite_shader->set_int("u_BloomBuffer", 1);
+        } else {
+            HZ_ENGINE_ERROR("Failed to read composite shader files");
+            return false;
+        }
+    } catch (const std::exception& e) {
+        HZ_ENGINE_ERROR("Failed to load composite shader: {}", e.what());
+        return false;
+    }
 
     m_initialized = true;
     HZ_ENGINE_INFO("Deferred Renderer initialized: {}x{}", width, height);
@@ -567,20 +678,121 @@ void DeferredRenderer::render_shadows(const glm::vec3& light_direction) {
     m_csm.unbind();
 }
 
+void DeferredRenderer::begin_shadow_pass(const glm::mat4& light_space_matrix) {
+    m_light_space_matrix = light_space_matrix;
+
+    glBindFramebuffer(GL_FRAMEBUFFER, m_csm.fbo);
+    glViewport(0, 0, static_cast<GLsizei>(m_csm.config.resolution),
+               static_cast<GLsizei>(m_csm.config.resolution));
+
+    // Depth-only
+    glDrawBuffer(GL_NONE);
+    glReadBuffer(GL_NONE);
+
+    glEnable(GL_DEPTH_TEST);
+    glEnable(GL_CULL_FACE);
+    glCullFace(GL_FRONT); // helps reduce shadow acne/peter panning tradeoff
+
+    glClear(GL_DEPTH_BUFFER_BIT);
+}
+
+void DeferredRenderer::end_shadow_pass() {
+    glCullFace(GL_BACK);
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
+    glViewport(0, 0, static_cast<GLsizei>(m_width), static_cast<GLsizei>(m_height));
+}
+
 void DeferredRenderer::execute_lighting_pass(const Camera& camera,
                                              const std::vector<GPUPointLight>& point_lights,
                                              const std::vector<GPUSpotLight>& spot_lights,
                                              const glm::vec3& sun_direction,
-                                             const glm::vec3& sun_color) {
+                                             const glm::vec3& sun_color, u32 irradiance_map,
+                                             u32 prefilter_map, u32 brdf_lut, u32 environment_map) {
     glBindFramebuffer(GL_FRAMEBUFFER, m_lighting_fbo);
+    glDrawBuffer(GL_COLOR_ATTACHMENT0);
     glViewport(0, 0, static_cast<GLsizei>(m_width), static_cast<GLsizei>(m_height));
     glClear(GL_COLOR_BUFFER_BIT);
     glDisable(GL_DEPTH_TEST);
 
-    m_gbuffer.bind_textures(0);
+    if (m_lighting_shader) {
+        m_lighting_shader->bind();
 
-    glActiveTexture(GL_TEXTURE0 + GBUFFER_COUNT + 1);
-    glBindTexture(GL_TEXTURE_2D, m_csm.depth_array_texture);
+        // Bind G-Buffer manually to match shader expectations
+        // Shader expects:
+        // 0: Albedo
+        // 1: Normal
+        // 2: Emission
+        // 3: Depth
+        // 4: ShadowMap
+
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_2D, m_gbuffer.color_textures[GBUFFER_ALBEDO_METALLIC]);
+
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_2D, m_gbuffer.color_textures[GBUFFER_NORMAL_ROUGHNESS]);
+
+        glActiveTexture(GL_TEXTURE2);
+        glBindTexture(GL_TEXTURE_2D, m_gbuffer.color_textures[GBUFFER_EMISSION_ID]);
+
+        // Skip Velocity (index 3) for lighting shader, bind Depth to unit 3 instead
+        // Skip Velocity (index 3) for lighting shader, bind Depth (Color Copy) to unit 3 instead
+        glActiveTexture(GL_TEXTURE3);
+        glBindTexture(GL_TEXTURE_2D, m_gbuffer.color_textures[GBUFFER_DEPTH_COPY]);
+
+        // Bind Shadows (4)
+        glActiveTexture(GL_TEXTURE4);
+        glBindTexture(GL_TEXTURE_2D, m_csm.depth_array_texture);
+
+        // Bind IBL (5, 6, 7)
+        // Bind IBL (5, 6, 7)
+        if (irradiance_map > 0 && prefilter_map > 0 && brdf_lut > 0) {
+            glActiveTexture(GL_TEXTURE5);
+            glBindTexture(GL_TEXTURE_CUBE_MAP, irradiance_map);
+            glActiveTexture(GL_TEXTURE6);
+            glBindTexture(GL_TEXTURE_CUBE_MAP, prefilter_map);
+            glActiveTexture(GL_TEXTURE7);
+            glBindTexture(GL_TEXTURE_2D, brdf_lut);
+        }
+
+        // AO (8) - bind white texture if not used, or SSAO
+        // ...
+
+        // Skybox cubemap (9) - used for background (depth==1)
+        if (environment_map > 0) {
+            glActiveTexture(GL_TEXTURE9);
+            glBindTexture(GL_TEXTURE_CUBE_MAP, environment_map);
+        }
+
+        // Set Uniforms
+        m_lighting_shader->set_vec3("u_ViewPos", camera.position());
+
+        // Inverse matrices for position reconstruction
+        auto projection =
+            camera.projection_matrix(static_cast<f32>(m_width) / static_cast<f32>(m_height));
+        auto view = camera.view_matrix();
+        m_lighting_shader->set_mat4("u_InverseProjection", glm::inverse(projection));
+        m_lighting_shader->set_mat4("u_InverseView", glm::inverse(view));
+
+        m_lighting_shader->set_vec3("u_SunDirection", sun_direction);
+        m_lighting_shader->set_vec3("u_SunColor", sun_color);
+        m_lighting_shader->set_float("u_SunIntensity", 3.0f); // Boost sun a bit
+        // IBL tuning: keep diffuse, reduce mirror-like reflections
+        m_lighting_shader->set_float("u_IBLIntensity", 0.7f);
+        m_lighting_shader->set_float("u_SpecularIBLIntensity", 0.25f);
+
+        // Shadows (single directional shadow map for now)
+        m_lighting_shader->set_mat4("u_LightSpaceMatrix", m_light_space_matrix);
+        m_lighting_shader->set_float("u_ShadowBias", 0.0015f);
+
+        // Point Lights
+        m_lighting_shader->set_int("u_PointLightCount", (int)point_lights.size());
+        for (size_t i = 0; i < point_lights.size() && i < 128; ++i) {
+            std::string base = "u_PointLightPositions[" + std::to_string(i) + "]";
+            m_lighting_shader->set_vec4(base, point_lights[i].position_radius);
+            base = "u_PointLightColors[" + std::to_string(i) + "]";
+            m_lighting_shader->set_vec4(base, point_lights[i].color_intensity);
+        }
+    }
 
     render_fullscreen_quad();
 
@@ -608,15 +820,32 @@ void DeferredRenderer::execute_taa_pass() {
         return;
 
     m_taa.bind();
+    glDrawBuffer(GL_COLOR_ATTACHMENT0);
     glClear(GL_COLOR_BUFFER_BIT);
     glDisable(GL_DEPTH_TEST);
 
+    if (m_taa_shader) {
+        m_taa_shader->bind();
+        m_taa_shader->set_float("u_FeedbackMin", m_taa.config.feedback_min);
+        m_taa_shader->set_float("u_FeedbackMax", m_taa.config.feedback_max);
+    }
+
+    // Texture 0: current lighting
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, m_lighting_texture);
-    glActiveTexture(GL_TEXTURE0 + 1);
+    // Texture 1: history
+    glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, m_taa.history_texture);
-    glActiveTexture(GL_TEXTURE0 + 2);
-    glBindTexture(GL_TEXTURE_2D, m_taa.velocity_texture);
+    // Texture 2: Velocity
+    glActiveTexture(GL_TEXTURE2);
+    // Velocity is at index 3 of GBuffer
+    glBindTexture(GL_TEXTURE_2D, m_gbuffer.color_textures[GBUFFER_VELOCITY]);
+    m_taa_shader->set_int("u_Velocity", 2);
+
+    // Texture 3: Depth (Color Copy R32F)
+    glActiveTexture(GL_TEXTURE3);
+    glBindTexture(GL_TEXTURE_2D, m_gbuffer.color_textures[GBUFFER_DEPTH_COPY]);
+    m_taa_shader->set_int("u_Depth", 3);
 
     render_fullscreen_quad();
     m_taa.unbind();
@@ -636,6 +865,16 @@ void DeferredRenderer::render_to_screen() {
 
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, m_taa.config.enabled ? m_taa.current_texture : m_lighting_texture);
+
+    if (m_composite_shader) {
+        m_composite_shader->bind();
+        m_composite_shader->set_float("u_Exposure", 1.0f);
+        m_composite_shader->set_float("u_BloomIntensity", 0.04f);
+        m_composite_shader->set_int("u_TonemapOperator", 0); // ACES
+        m_composite_shader->set_bool("u_BloomEnabled", false);
+        // Enable FXAA always for extra edge smoothing (works well after TAA)
+        m_composite_shader->set_bool("u_FXAAEnabled", true);
+    }
 
     render_fullscreen_quad();
 }
