@@ -1,0 +1,11 @@
+Model Information:
+* title:	Joe | Realistic Human 3D Model
+* source:	https://sketchfab.com/3d-models/joe-realistic-human-3d-model-2a108401fe5547409a3ad666b9b7d6b3
+* author:	Arjun P Krishna (https://sketchfab.com/arjunpkrishna)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Joe | Realistic Human 3D Model" (https://sketchfab.com/3d-models/joe-realistic-human-3d-model-2a108401fe5547409a3ad666b9b7d6b3) by Arjun P Krishna (https://sketchfab.com/arjunpkrishna) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
