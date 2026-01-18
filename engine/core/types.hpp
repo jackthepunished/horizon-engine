@@ -130,6 +130,10 @@ struct TransparentStringHash {
 
 #define HZ_UNUSED(x) (void)(x)
 
+// Token concatenation helpers
+#define HZ_CONCAT_IMPL(a, b) a##b
+#define HZ_CONCAT(a, b) HZ_CONCAT_IMPL(a, b)
+
 #define HZ_NON_COPYABLE(ClassName)                                                                 \
     ClassName(const ClassName&) = delete;                                                          \
     ClassName& operator=(const ClassName&) = delete
@@ -141,5 +145,59 @@ struct TransparentStringHash {
 #define HZ_DEFAULT_MOVABLE(ClassName)                                                              \
     ClassName(ClassName&&) noexcept = default;                                                     \
     ClassName& operator=(ClassName&&) noexcept = default
+
+// ============================================================================
+// Bitmask Operators for enum class
+// ============================================================================
+
+/**
+ * @brief Enable bitwise operators for enum class types
+ *
+ * Usage: HZ_ENABLE_BITMASK_OPERATORS(MyEnumClass)
+ */
+#define HZ_ENABLE_BITMASK_OPERATORS(Enum)                                                          \
+    [[nodiscard]] inline constexpr Enum operator|(Enum a, Enum b) noexcept {                       \
+        return static_cast<Enum>(static_cast<std::underlying_type_t<Enum>>(a) |                    \
+                                 static_cast<std::underlying_type_t<Enum>>(b));                    \
+    }                                                                                              \
+    [[nodiscard]] inline constexpr Enum operator&(Enum a, Enum b) noexcept {                       \
+        return static_cast<Enum>(static_cast<std::underlying_type_t<Enum>>(a) &                    \
+                                 static_cast<std::underlying_type_t<Enum>>(b));                    \
+    }                                                                                              \
+    [[nodiscard]] inline constexpr Enum operator^(Enum a, Enum b) noexcept {                       \
+        return static_cast<Enum>(static_cast<std::underlying_type_t<Enum>>(a) ^                    \
+                                 static_cast<std::underlying_type_t<Enum>>(b));                    \
+    }                                                                                              \
+    [[nodiscard]] inline constexpr Enum operator~(Enum a) noexcept {                               \
+        return static_cast<Enum>(~static_cast<std::underlying_type_t<Enum>>(a));                   \
+    }                                                                                              \
+    inline constexpr Enum& operator|=(Enum& a, Enum b) noexcept {                                  \
+        return a = a | b;                                                                          \
+    }                                                                                              \
+    inline constexpr Enum& operator&=(Enum& a, Enum b) noexcept {                                  \
+        return a = a & b;                                                                          \
+    }                                                                                              \
+    inline constexpr Enum& operator^=(Enum& a, Enum b) noexcept {                                  \
+        return a = a ^ b;                                                                          \
+    }
+
+/**
+ * @brief Check if a bitmask contains a specific flag
+ */
+template <typename Enum>
+[[nodiscard]] inline constexpr bool has_flag(Enum value, Enum flag) noexcept {
+    return (static_cast<std::underlying_type_t<Enum>>(value) &
+            static_cast<std::underlying_type_t<Enum>>(flag)) ==
+           static_cast<std::underlying_type_t<Enum>>(flag);
+}
+
+/**
+ * @brief Check if a bitmask has any of the specified flags
+ */
+template <typename Enum>
+[[nodiscard]] inline constexpr bool has_any_flag(Enum value, Enum flags) noexcept {
+    return (static_cast<std::underlying_type_t<Enum>>(value) &
+            static_cast<std::underlying_type_t<Enum>>(flags)) != 0;
+}
 
 } // namespace hz

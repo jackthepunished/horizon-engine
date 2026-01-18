@@ -124,6 +124,28 @@ FetchContent_Declare(
 )
 
 # ============================================================================
+# Vulkan Memory Allocator (VMA)
+# ============================================================================
+
+FetchContent_Declare(
+    VulkanMemoryAllocator
+    GIT_REPOSITORY https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git
+    GIT_TAG v3.1.0
+    GIT_SHALLOW TRUE
+)
+
+# ============================================================================
+# volk - Vulkan Loader (meta-loader for Vulkan functions)
+# ============================================================================
+
+FetchContent_Declare(
+    volk
+    GIT_REPOSITORY https://github.com/zeux/volk.git
+    GIT_TAG 1.3.295
+    GIT_SHALLOW TRUE
+)
+
+# ============================================================================
 # Catch2 - Testing (only if tests enabled)
 # ============================================================================
 
@@ -141,7 +163,7 @@ endif()
 # Make All Available
 # ============================================================================
 
-FetchContent_MakeAvailable(glfw spdlog stb tinyobjloader JoltPhysics imgui miniaudio entt)
+FetchContent_MakeAvailable(glfw spdlog stb tinyobjloader JoltPhysics imgui miniaudio entt VulkanMemoryAllocator volk)
 
 # Manually setup GLM to avoid its deprecated CMakeLists.txt
 FetchContent_GetProperties(glm)
@@ -184,3 +206,28 @@ target_include_directories(imgui_lib PUBLIC
 )
 
 target_link_libraries(imgui_lib PUBLIC glfw)
+
+# ============================================================================
+# Vulkan SDK detection
+# ============================================================================
+
+find_package(Vulkan QUIET)
+if(Vulkan_FOUND)
+    message(STATUS "Found Vulkan: ${Vulkan_LIBRARY}")
+    set(HZ_HAS_VULKAN ON CACHE BOOL "Vulkan support available" FORCE)
+else()
+    message(STATUS "Vulkan SDK not found - Vulkan backend will be disabled")
+    set(HZ_HAS_VULKAN OFF CACHE BOOL "Vulkan support available" FORCE)
+endif()
+
+# VMA (Vulkan Memory Allocator) - header-only
+if(HZ_HAS_VULKAN)
+    add_library(vma INTERFACE)
+    target_include_directories(vma INTERFACE ${vulkanmemoryallocator_SOURCE_DIR}/include)
+    target_link_libraries(vma INTERFACE Vulkan::Vulkan)
+    
+    # volk - Vulkan meta-loader
+    set(VOLK_STATIC_DEFINES ON CACHE BOOL "" FORCE)
+    set(VOLK_PULL_IN_VULKAN OFF CACHE BOOL "" FORCE)
+    target_include_directories(volk PUBLIC ${Vulkan_INCLUDE_DIRS})
+endif()

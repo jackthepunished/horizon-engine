@@ -73,6 +73,19 @@ set(ENGINE_SOURCES
     vendor/ufbx/ufbx.c
 )
 
+# RHI Vulkan Backend Sources (conditionally added)
+set(ENGINE_VULKAN_SOURCES
+    rhi/vulkan/vk_device.cpp
+    rhi/vulkan/vk_buffer.cpp
+    rhi/vulkan/vk_texture.cpp
+    rhi/vulkan/vk_sampler.cpp
+    rhi/vulkan/vk_sync.cpp
+    rhi/vulkan/vk_pipeline.cpp
+    rhi/vulkan/vk_descriptor.cpp
+    rhi/vulkan/vk_command_list.cpp
+    rhi/vulkan/vk_swapchain.cpp
+)
+
 set(ENGINE_HEADERS
     # Core
     core/types.hpp
@@ -121,10 +134,36 @@ set(ENGINE_HEADERS
     renderer/opengl/buffer.hpp
     renderer/opengl/uniform_buffer.hpp
 
+    # RHI (Render Hardware Interface)
+    rhi/rhi.hpp
+    rhi/rhi_types.hpp
+    rhi/rhi_resources.hpp
+    rhi/rhi_pipeline.hpp
+    rhi/rhi_descriptor.hpp
+    rhi/rhi_command_list.hpp
+    rhi/rhi_device.hpp
+
+    # RHI Vulkan Backend
+    rhi/vulkan/vk_common.hpp
+    rhi/vulkan/vk_device.hpp
+    rhi/vulkan/vk_buffer.hpp
+    rhi/vulkan/vk_texture.hpp
+    rhi/vulkan/vk_sampler.hpp
+    rhi/vulkan/vk_sync.hpp
+    rhi/vulkan/vk_pipeline.hpp
+    rhi/vulkan/vk_descriptor.hpp
+    rhi/vulkan/vk_command_list.hpp
+    rhi/vulkan/vk_swapchain.hpp
+
     # GLAD
     vendor/glad/glad.h
     vendor/ufbx/ufbx.h
 )
+
+# Conditionally add Vulkan sources if Vulkan is available
+if(HZ_HAS_VULKAN)
+    list(APPEND ENGINE_SOURCES ${ENGINE_VULKAN_SOURCES})
+endif()
 
 add_library(horizon_engine STATIC ${ENGINE_SOURCES} ${ENGINE_HEADERS})
 
@@ -150,9 +189,20 @@ target_link_libraries(horizon_engine
         tinyobj
 )
 
+# Link Vulkan dependencies if available
+if(HZ_HAS_VULKAN)
+    target_link_libraries(horizon_engine
+        PUBLIC
+            volk
+        PRIVATE
+            vma
+    )
+endif()
+
 target_compile_definitions(horizon_engine
     PUBLIC
         GLM_FORCE_RADIANS
         GLM_FORCE_DEPTH_ZERO_TO_ONE
         $<$<BOOL:${HZ_HEADLESS}>:HZ_HEADLESS=1>
+        $<$<BOOL:${HZ_HAS_VULKAN}>:HZ_VULKAN_BACKEND=1>
 )

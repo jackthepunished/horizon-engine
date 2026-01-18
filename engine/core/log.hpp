@@ -86,8 +86,15 @@ private:
 #define HZ_LOG_DEBUG(...) ::hz::Log::app_logger()->debug(__VA_ARGS__)
 #define HZ_LOG_INFO(...) ::hz::Log::app_logger()->info(__VA_ARGS__)
 #define HZ_LOG_WARN(...) ::hz::Log::app_logger()->warn(__VA_ARGS__)
+#define HZ_LOG_ERROR(...) ::hz::Log::app_logger()->error(__VA_ARGS__)
+#define HZ_LOG_CRITICAL(...) ::hz::Log::app_logger()->critical(__VA_ARGS__)
+
+// Deprecated macros (use HZ_LOG_* instead)
 #define HZ_ERROR(...) ::hz::Log::app_logger()->error(__VA_ARGS__)
 #define HZ_FATAL(...) ::hz::Log::app_logger()->critical(__VA_ARGS__)
+
+// Utility macros
+#define HZ_UNUSED(x) (void)(x)
 
 // ============================================================================
 // Assertions
