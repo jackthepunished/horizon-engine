@@ -170,4 +170,137 @@ struct LightComponent {
     }
 };
 
+// ==========================================
+// Camera Component
+// ==========================================
+struct CameraComponent {
+    float fov{45.0f};
+    float near_plane{0.1f};
+    float far_plane{1000.0f};
+    bool primary{true};
+
+    // Serialization
+    friend void to_json(nlohmann::json& j, const CameraComponent& c) {
+        j = nlohmann::json{{"fov", c.fov},
+                           {"near_plane", c.near_plane},
+                           {"far_plane", c.far_plane},
+                           {"primary", c.primary}};
+    }
+    friend void from_json(const nlohmann::json& j, CameraComponent& c) {
+        c.fov = j.value("fov", 45.0f);
+        c.near_plane = j.value("near_plane", 0.1f);
+        c.far_plane = j.value("far_plane", 1000.0f);
+        c.primary = j.value("primary", true);
+    }
+};
+
+// ==========================================
+// Physics Components
+// ==========================================
+struct RigidBodyComponent {
+    enum class BodyType { Static, Dynamic, Kinematic };
+    BodyType type{BodyType::Static};
+    float mass{1.0f};
+    bool fixed_rotation{false};
+
+    // Runtime data (not serialized)
+    // We store the ID here to link ECS entity to Jolt body
+    // In a real engine, we might want a separate system to map Entity <-> BodyID
+    // to avoid storing runtime data in components, but this is simple and effective.
+    //
+    // Note: Using std::unique_ptr with type-erased deleter to avoid Jolt header dependency
+    // while still ensuring proper cleanup when entity is destroyed.
+    std::unique_ptr<void, void (*)(void*)> runtime_body{
+        nullptr, [](void* p) {
+            // Intentionally empty - PhysicsBodyID is trivially destructible
+            // The actual physics body is managed by PhysicsWorld
+            delete static_cast<char*>(p); // Safe deletion for any trivially destructible type
+        }};
+    bool created{false}; // Flag to check if body needs creation
+
+    // Helper to safely access the body ID
+    template <typename T>
+    [[nodiscard]] T* get_body_id() const {
+        return static_cast<T*>(runtime_body.get());
+    }
+
+    // Helper to set the body ID (takes ownership)
+    template <typename T>
+    void set_body_id(T* body_id) {
+        runtime_body.reset(body_id);
+    }
+
+    // Serialization
+    friend void to_json(nlohmann::json& j, const RigidBodyComponent& c) {
+        j = nlohmann::json{{"type", static_cast<int>(c.type)},
+                           {"mass", c.mass},
+                           {"fixed_rotation", c.fixed_rotation}};
+    }
+    friend void from_json(const nlohmann::json& j, RigidBodyComponent& c) {
+        c.type = static_cast<BodyType>(j.value("type", 0));
+        c.mass = j.value("mass", 1.0f);
+        c.fixed_rotation = j.value("fixed_rotation", false);
+    }
+};
+
+struct BoxColliderComponent {
+    glm::vec3 half_extents{0.5f};
+    glm::vec3 offset{0.0f};
+
+    friend void to_json(nlohmann::json& j, const BoxColliderComponent& c) {
+        j = nlohmann::json{{"half_extents", TransformComponent::vec3_to_json(c.half_extents)},
+                           {"offset", TransformComponent::vec3_to_json(c.offset)}};
+    }
+    friend void from_json(const nlohmann::json& j, BoxColliderComponent& c) {
+        if (j.contains("half_extents"))
+            c.half_extents = TransformComponent::vec3_from_json(j["half_extents"]);
+        if (j.contains("offset"))
+            c.offset = TransformComponent::vec3_from_json(j["offset"]);
+    }
+};
+
+struct CapsuleColliderComponent {
+    float radius{0.5f};
+    float half_height{0.5f}; // Cylinder half-height. Total height = 2*half_height + 2*radius
+    glm::vec3 offset{0.0f};
+
+    friend void to_json(nlohmann::json& j, const CapsuleColliderComponent& c) {
+        j = nlohmann::json{{"radius", c.radius},
+                           {"half_height", c.half_height},
+                           {"offset", TransformComponent::vec3_to_json(c.offset)}};
+    }
+    friend void from_json(const nlohmann::json& j, CapsuleColliderComponent& c) {
+        c.radius = j.value("radius", 0.5f);
+        c.half_height = j.value("half_height", 0.5f);
+        if (j.contains("offset"))
+            c.offset = TransformComponent::vec3_from_json(j["offset"]);
+    }
+};
+
+struct LifetimeComponent {
+    float time_remaining{1.0f};
+};
+
+// ==========================================
+// IK Component
+// ==========================================
+struct IKTargetComponent {
+    // Bone IDs for IK chain (e.g., shoulder, elbow, hand)
+    i32 root_bone_id{-1};
+    i32 mid_bone_id{-1};
+    i32 end_bone_id{-1};
+
+    // Target position in world space
+    glm::vec3 target_position{0.0f};
+
+    // Pole vector for controlling bend direction
+    glm::vec3 pole_vector{0.0f, 0.0f, -1.0f};
+
+    // Weight for blending IK with animation [0-1]
+    float weight{1.0f};
+
+    // Is IK active?
+    bool enabled{true};
+};
+
 } // namespace hz

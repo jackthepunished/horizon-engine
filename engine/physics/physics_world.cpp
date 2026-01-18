@@ -1,9 +1,7 @@
-// Disable Jolt's Debug renderer in non-debug builds
-#ifndef JPH_DEBUG_RENDERER
-#define JPH_DEBUG_RENDERER 0
-#endif
-
+// Include physics config first (sets up JPH_DEBUG_RENDERER before Jolt headers)
 #include "physics_world.hpp"
+
+#include "physics_config.hpp"
 
 #include <cstdlib>
 #include <thread>
@@ -274,6 +272,32 @@ PhysicsBodyID PhysicsWorld::create_dynamic_sphere(const glm::vec3& position, f32
     return {body_id};
 }
 
+PhysicsBodyID PhysicsWorld::create_dynamic_capsule(const glm::vec3& position, f32 half_height,
+                                                   f32 radius, f32 mass) {
+    if (!m_initialized)
+        return PhysicsBodyID::invalid();
+
+    auto& body_interface = m_physics_system->GetBodyInterface();
+
+    JPH::CapsuleShapeSettings capsule_settings(half_height, radius);
+    JPH::ShapeSettings::ShapeResult shape_result = capsule_settings.Create();
+
+    if (shape_result.HasError()) {
+        HZ_ENGINE_ERROR("Failed to create capsule shape: {}", shape_result.GetError().c_str());
+        return PhysicsBodyID::invalid();
+    }
+
+    JPH::BodyCreationSettings body_settings(
+        shape_result.Get(), JPH::RVec3(position.x, position.y, position.z), JPH::Quat::sIdentity(),
+        JPH::EMotionType::Dynamic, PhysicsLayers::MOVING);
+    body_settings.mOverrideMassProperties = JPH::EOverrideMassProperties::CalculateInertia;
+    body_settings.mMassPropertiesOverride.mMass = mass;
+
+    JPH::BodyID body_id =
+        body_interface.CreateAndAddBody(body_settings, JPH::EActivation::Activate);
+    return {body_id};
+}
+
 void PhysicsWorld::remove_body(PhysicsBodyID body_id) {
     if (!m_initialized || !body_id.is_valid())
         return;
@@ -308,6 +332,15 @@ void PhysicsWorld::set_body_position(PhysicsBodyID body_id, const glm::vec3& pos
     auto& body_interface = m_physics_system->GetBodyInterface();
     body_interface.SetPosition(body_id.id, JPH::RVec3(position.x, position.y, position.z),
                                JPH::EActivation::Activate);
+}
+
+glm::vec3 PhysicsWorld::get_body_velocity(PhysicsBodyID body_id) const {
+    if (!m_initialized || !body_id.is_valid())
+        return glm::vec3(0.0f);
+
+    auto& body_interface = m_physics_system->GetBodyInterface();
+    JPH::Vec3 vel = body_interface.GetLinearVelocity(body_id.id);
+    return glm::vec3(vel.GetX(), vel.GetY(), vel.GetZ());
 }
 
 void PhysicsWorld::set_body_velocity(PhysicsBodyID body_id, const glm::vec3& velocity) {

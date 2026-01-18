@@ -20,10 +20,6 @@ set(ENGINE_SOURCES
     platform/window.cpp
     platform/input.cpp
 
-    # ECS (Deprecated - To be removed)
-    # ecs/entity_manager.cpp
-    # ecs/world.cpp
-
     # Scene
     scene/scene.cpp
     scene/components.cpp
@@ -61,15 +57,20 @@ set(ENGINE_SOURCES
     renderer/opengl/shader.cpp
     renderer/opengl/uniform_buffer.cpp
     renderer/deferred_renderer.cpp
+    renderer/debug_renderer.cpp
+    renderer/cinematic_camera.cpp
 
     # Audio
     audio/audio_engine.cpp
 
     # Animation
     animation/skeleton.cpp
+    animation/ik_solver.cpp
+    animation/animation_blender.cpp
 
     # GLAD (OpenGL loader)
     vendor/glad/glad.c
+    vendor/ufbx/ufbx.c
 )
 
 set(ENGINE_HEADERS
@@ -84,13 +85,6 @@ set(ENGINE_HEADERS
     platform/window.hpp
     platform/input.hpp
 
-    # ECS
-    # ECS (Deprecated)
-    # ecs/entity.hpp
-    # ecs/component_storage.hpp
-    # ecs/system.hpp
-    # ecs/world.hpp
-    
     # Scene
     scene/scene.hpp
 
@@ -101,6 +95,7 @@ set(ENGINE_HEADERS
     assets/asset_registry.hpp
 
     # Physics
+    physics/physics_config.hpp
     physics/physics_world.hpp
     physics/fps_character_controller.hpp
     physics/hitbox_system.hpp
@@ -123,12 +118,12 @@ set(ENGINE_HEADERS
     renderer/billboard.hpp
     renderer/opengl/gl_context.hpp
     renderer/opengl/shader.hpp
-    renderer/opengl/shader.hpp
     renderer/opengl/buffer.hpp
     renderer/opengl/uniform_buffer.hpp
 
     # GLAD
     vendor/glad/glad.h
+    vendor/ufbx/ufbx.h
 )
 
 add_library(horizon_engine STATIC ${ENGINE_SOURCES} ${ENGINE_HEADERS})

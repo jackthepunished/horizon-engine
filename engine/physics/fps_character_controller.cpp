@@ -1,11 +1,8 @@
-// Disable Jolt's Debug renderer in non-debug builds
-#ifndef JPH_DEBUG_RENDERER
-#define JPH_DEBUG_RENDERER 0
-#endif
-
+// Include physics config first (sets up JPH_DEBUG_RENDERER before Jolt headers)
 #include "fps_character_controller.hpp"
 
 #include "engine/core/log.hpp"
+#include "physics_config.hpp"
 
 #include <cmath>
 
@@ -69,10 +66,12 @@ bool FPSCharacterController::init(PhysicsWorld& physics_world, const glm::vec3& 
     character_settings.mPenetrationRecoverySpeed = 1.0f;
     character_settings.mPredictiveContactDistance = 0.1f;
 
-    // Create the character
+    // Create the character (JPH::Ref handles reference counting automatically)
     m_character = new JPH::CharacterVirtual(&character_settings,
                                             JPH::RVec3(position.x, position.y, position.z),
                                             JPH::Quat::sIdentity(), m_physics_world->jolt_system());
+    // Note: JPH::Ref<T> is Jolt's intrusive smart pointer - it automatically
+    // decrements the reference count when destroyed/reassigned to nullptr
 
     m_initialized = true;
     HZ_ENGINE_INFO("FPS Character Controller initialized at ({:.2f}, {:.2f}, {:.2f})", position.x,

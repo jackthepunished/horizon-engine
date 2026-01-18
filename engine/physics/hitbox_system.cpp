@@ -1,12 +1,9 @@
-// Disable Jolt's Debug renderer in non-debug builds
-#ifndef JPH_DEBUG_RENDERER
-#define JPH_DEBUG_RENDERER 0
-#endif
-
+// Include physics config first (sets up JPH_DEBUG_RENDERER before Jolt headers)
 #include "hitbox_system.hpp"
 
 #include "engine/core/log.hpp"
 #include "engine/scene/components.hpp"
+#include "physics_config.hpp"
 
 #include <Jolt/Physics/Body/BodyCreationSettings.h>
 #include <glm/gtc/matrix_transform.hpp>

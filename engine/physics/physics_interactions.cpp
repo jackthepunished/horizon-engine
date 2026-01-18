@@ -1,17 +1,15 @@
-// Disable Jolt's Debug renderer in non-debug builds
-#ifndef JPH_DEBUG_RENDERER
-#define JPH_DEBUG_RENDERER 0
-#endif
-
+// Include physics config first (sets up JPH_DEBUG_RENDERER before Jolt headers)
 #include "physics_interactions.hpp"
 
 #include "engine/core/log.hpp"
 #include "engine/scene/components.hpp"
+#include "physics_config.hpp"
 
 #include <algorithm>
 #include <cmath>
 
 #include <Jolt/Physics/Body/BodyCreationSettings.h>
+#include <glm/gtc/constants.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 
 namespace hz {
@@ -186,8 +184,8 @@ void PhysicsInteractionSystem::spawn_debris(entt::registry& registry, const glm:
 
     for (int i = 0; i < destructible.debris_count; ++i) {
         // Random direction for debris
-        f32 theta = static_cast<f32>(rand()) / RAND_MAX * 2.0f * 3.14159f;
-        f32 phi = static_cast<f32>(rand()) / RAND_MAX * 3.14159f;
+        f32 theta = static_cast<f32>(rand()) / RAND_MAX * glm::two_pi<f32>();
+        f32 phi = static_cast<f32>(rand()) / RAND_MAX * glm::pi<f32>();
 
         glm::vec3 dir(std::sin(phi) * std::cos(theta),
                       std::cos(phi) + 0.5f, // Bias upward
