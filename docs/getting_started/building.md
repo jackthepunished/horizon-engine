@@ -8,19 +8,17 @@ Horizon Engine targets **C++20** and strictly adheres to modern standards.
 
 - **Compiler**: MSVC 2022 (v143) or Clang-CL 14+
 - **Tools**: CMake 3.21+, Ninja
-- **SDKs**: Vulkan SDK 1.3+
 
 ### macOS
 
 - **Compiler**: Apple Clang 14+ (Xcode 14+)
 - **Tools**: CMake 3.21+, Ninja
-- **SDKs**: Vulkan SDK (via MoltenVK, usually included in the installer)
 
 ### Linux
 
 - **Compiler**: GCC 11+ or Clang 14+
 - **Tools**: CMake 3.21+, Ninja, Make
-- **Packages**: `libx11-dev`, `libwayland-dev`, `libxkbcommon-dev`
+- **Packages**: `libx11-dev`, `libwayland-dev`, `libxkbcommon-dev`, `libxcursor-dev`, `libxinerama-dev`, `libxrandr-dev`, `libxi-dev`
 
 ---
 
@@ -54,12 +52,28 @@ We recommend using **Ninja** for the fastest build times.
 
 ---
 
+## Build Options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `HZ_BUILD_TESTS` | `ON` | Build unit tests |
+| `WERROR` | `OFF` | Treat warnings as errors |
+| `HZ_HEADLESS` | `OFF` | Build without display (for CI) |
+
+Example with options:
+```bash
+cmake -B build -DCMAKE_BUILD_TYPE=Release -DHZ_BUILD_TESTS=ON -DWERROR=ON -GNinja
+```
+
+---
+
 ## Troubleshooting
 
 ### "C++20 not supported"
 
-Ensure you are not using an old compiler. Check `g++ --version` or `dxc --version`.
+Ensure you are not using an old compiler. Check `g++ --version` or `clang++ --version`.
 
-### "Vulkan SDK not found"
+### "OpenGL context creation failed"
 
-The engine requires the `VULKAN_SDK` environment variable to be set. Install the SDK from [LunarG](https://vulkan.lunarg.com/).
+- **macOS**: Ensure you have a display available. For headless builds, use `-DHZ_HEADLESS=ON`.
+- **Linux**: Install Mesa or proprietary GPU drivers.
