@@ -39,6 +39,7 @@ struct TextureParams {
     TextureWrap wrap_t{TextureWrap::Repeat};
     bool generate_mipmaps{true};
     bool srgb{true};
+    bool flip_y{false}; // Set to false for GLTF textures (GLTF uses OpenGL UV convention)
 };
 
 /**
@@ -65,6 +66,12 @@ public:
      */
     [[nodiscard]] static Texture create(u32 width, u32 height, TextureFormat format,
                                         const void* data, const TextureParams& params = {});
+
+    /**
+     * @brief Load texture from memory buffer (e.g., embedded FBX texture)
+     */
+    [[nodiscard]] static Texture load_from_memory(const unsigned char* data, size_t size,
+                                                  const TextureParams& params = {});
 
     /**
      * @brief Bind texture to a texture unit

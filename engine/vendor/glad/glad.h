@@ -413,6 +413,35 @@ GLAPI void(GLAPIENTRY* glTexParameterfv)(GLenum target, GLenum pname, const GLfl
 #define GL_CLAMP_TO_BORDER 0x812D
 #define GL_TEXTURE_BORDER_COLOR 0x1004
 
+/* MRT (Multiple Render Targets) - OpenGL 2.0+ */
+#define GL_COLOR_ATTACHMENT1 0x8CE1
+#define GL_COLOR_ATTACHMENT2 0x8CE2
+#define GL_COLOR_ATTACHMENT3 0x8CE3
+#define GL_COLOR_ATTACHMENT4 0x8CE4
+#define GL_COLOR_ATTACHMENT5 0x8CE5
+#define GL_MAX_COLOR_ATTACHMENTS 0x8CDF
+#define GL_MAX_DRAW_BUFFERS 0x8824
+
+/* Additional texture units */
+#define GL_TEXTURE1 0x84C1
+#define GL_TEXTURE2 0x84C2
+#define GL_TEXTURE3 0x84C3
+#define GL_TEXTURE4 0x84C4
+#define GL_TEXTURE5 0x84C5
+#define GL_TEXTURE6 0x84C6
+#define GL_TEXTURE7 0x84C7
+#define GL_TEXTURE8 0x84C8
+#define GL_TEXTURE9 0x84C9
+#define GL_TEXTURE10 0x84CA
+#define GL_TEXTURE11 0x84CB
+#define GL_TEXTURE12 0x84CC
+#define GL_TEXTURE13 0x84CD
+#define GL_TEXTURE14 0x84CE
+#define GL_TEXTURE15 0x84CF
+
+/* MRT function */
+GLAPI void(GLAPIENTRY* glDrawBuffers)(GLsizei n, const GLenum* bufs);
+
 #ifdef __cplusplus
 }
 #endif

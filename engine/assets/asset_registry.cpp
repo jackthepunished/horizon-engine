@@ -77,7 +77,15 @@ ModelHandle AssetRegistry::load_model(std::string_view path) {
         return {it->second, slot.generation};
     }
 
-    Model model = Model::load_from_obj(path);
+    // Load based on extension
+    Model model;
+    if (path_str.ends_with(".gltf") || path_str.ends_with(".glb")) {
+        model = Model::load_from_gltf(path);
+    } else if (path_str.ends_with(".fbx")) {
+        model = Model::load_from_fbx(path);
+    } else {
+        model = Model::load_from_obj(path);
+    }
     if (!model.is_valid()) {
         return ModelHandle::invalid();
     }
@@ -114,7 +122,14 @@ bool AssetRegistry::reload_model(ModelHandle handle) {
     if (slot.generation != handle.generation)
         return false;
 
-    Model new_model = Model::load_from_obj(slot.path);
+    Model new_model;
+    if (slot.path.ends_with(".gltf") || slot.path.ends_with(".glb")) {
+        new_model = Model::load_from_gltf(slot.path);
+    } else if (slot.path.ends_with(".fbx")) {
+        new_model = Model::load_from_fbx(slot.path);
+    } else {
+        new_model = Model::load_from_obj(slot.path);
+    }
     if (!new_model.is_valid())
         return false;
 

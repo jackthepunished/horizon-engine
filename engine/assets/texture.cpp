@@ -104,7 +104,9 @@ GLenum to_gl_format(TextureFormat format) {
 
 Texture Texture::load_from_file(std::string_view path, const TextureParams& params) {
     // Load image with stb_image
-    stbi_set_flip_vertically_on_load(true);
+    // GLTF uses OpenGL UV convention (origin at bottom-left), so flip_y should be false for GLTF
+    // For other formats (OBJ, etc.) flip_y = true is typically needed
+    stbi_set_flip_vertically_on_load(params.flip_y ? 1 : 0);
 
     int width, height, channels;
     unsigned char* data = stbi_load(std::string(path).c_str(), &width, &height, &channels, 0);
@@ -138,6 +140,51 @@ Texture Texture::load_from_file(std::string_view path, const TextureParams& para
     stbi_image_free(data);
 
     HZ_ENGINE_INFO("Loaded texture: {} ({}x{}, {} channels)", path, width, height, channels);
+    return tex;
+}
+
+Texture Texture::load_from_memory(const unsigned char* data, size_t size,
+                                  const TextureParams& params) {
+    if (!data || size == 0) {
+        HZ_ENGINE_ERROR("Failed to load texture from memory: empty data");
+        return {};
+    }
+
+    stbi_set_flip_vertically_on_load(params.flip_y ? 1 : 0);
+
+    int width, height, channels;
+    unsigned char* pixels =
+        stbi_load_from_memory(data, static_cast<int>(size), &width, &height, &channels, 0);
+
+    if (!pixels) {
+        HZ_ENGINE_ERROR("Failed to decode texture from memory: {}", stbi_failure_reason());
+        return {};
+    }
+
+    // Determine format
+    TextureFormat format;
+    switch (channels) {
+    case 1:
+        format = TextureFormat::R8;
+        break;
+    case 2:
+        format = TextureFormat::RG8;
+        break;
+    case 3:
+        format = params.srgb ? TextureFormat::SRGB8 : TextureFormat::RGB8;
+        break;
+    case 4:
+    default:
+        format = params.srgb ? TextureFormat::SRGBA8 : TextureFormat::RGBA8;
+        break;
+    }
+
+    Texture tex = create(static_cast<u32>(width), static_cast<u32>(height), format, pixels, params);
+    tex.m_path = "[embedded]";
+
+    stbi_image_free(pixels);
+
+    HZ_ENGINE_INFO("Loaded embedded texture ({}x{}, {} channels)", width, height, channels);
     return tex;
 }
 

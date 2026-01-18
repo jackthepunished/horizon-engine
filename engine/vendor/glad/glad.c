@@ -125,6 +125,9 @@ void(GLAPIENTRY* glDebugMessageCallback)(GLDEBUGPROC callback, const void* userP
 void(GLAPIENTRY* glDebugMessageControl)(GLenum source, GLenum type, GLenum severity, GLsizei count,
                                         const GLuint* ids, GLboolean enabled) = NULL;
 
+/* MRT (Multiple Render Targets) */
+void(GLAPIENTRY* glDrawBuffers)(GLsizei n, const GLenum* bufs) = NULL;
+
 /* Type for function pointers */
 typedef void* (*GLloadproc)(const char* name);
 
@@ -244,6 +247,9 @@ static void load_GL_version_4_1(GLloadproc load) {
     glDrawBuffer = (void(GLAPIENTRY*)(GLenum))load("glDrawBuffer");
     glReadBuffer = (void(GLAPIENTRY*)(GLenum))load("glReadBuffer");
     glTexParameterfv = (void(GLAPIENTRY*)(GLenum, GLenum, const GLfloat*))load("glTexParameterfv");
+
+    /* MRT (Multiple Render Targets) */
+    glDrawBuffers = (void(GLAPIENTRY*)(GLsizei, const GLenum*))load("glDrawBuffers");
 }
 
 int gladLoadGLLoader(void* (*load)(const char* name)) {
