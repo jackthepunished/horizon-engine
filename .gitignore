@@ -35,3 +35,4 @@ Thumbs.db
 # Vulkan compiled shaders
 *.spv
 imgui.ini
+build_log.txt
