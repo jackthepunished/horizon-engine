@@ -431,9 +431,222 @@ void DeferredRenderer::reset_stats() {
 // =========================================================================
 
 void DeferredRenderer::create_pipelines() {
-    // TODO: Create RHI pipelines
-    // m_geometry_pipeline = device.create_pipeline(...);
-    // m_lighting_pipeline = device.create_pipeline(...);
+    // =========================================================================
+    // Descriptor Set Layouts
+    // =========================================================================
+
+    // Camera layout (set 0, binding 0: CameraUBO)
+    {
+        rhi::DescriptorSetLayoutDesc desc;
+        desc.bindings.push_back(rhi::DescriptorBinding::uniform_buffer(
+            0, rhi::ShaderStage::Vertex | rhi::ShaderStage::Fragment));
+        m_camera_layout = m_device.create_descriptor_set_layout(desc);
+    }
+
+    // Material layout (set 1: albedo, normal, ARM textures)
+    {
+        rhi::DescriptorSetLayoutDesc desc;
+        desc.bindings.push_back(
+            rhi::DescriptorBinding::combined_image_sampler(0, rhi::ShaderStage::Fragment));
+        desc.bindings.push_back(
+            rhi::DescriptorBinding::combined_image_sampler(1, rhi::ShaderStage::Fragment));
+        desc.bindings.push_back(
+            rhi::DescriptorBinding::combined_image_sampler(2, rhi::ShaderStage::Fragment));
+        m_material_layout = m_device.create_descriptor_set_layout(desc);
+    }
+
+    // GBuffer input layout (set 1: GBuffer textures for lighting pass)
+    {
+        rhi::DescriptorSetLayoutDesc desc;
+        desc.bindings.push_back(
+            rhi::DescriptorBinding::sampled_image(0, rhi::ShaderStage::Fragment));
+        desc.bindings.push_back(
+            rhi::DescriptorBinding::sampled_image(1, rhi::ShaderStage::Fragment));
+        desc.bindings.push_back(
+            rhi::DescriptorBinding::sampled_image(2, rhi::ShaderStage::Fragment));
+        desc.bindings.push_back(
+            rhi::DescriptorBinding::sampled_image(3, rhi::ShaderStage::Fragment));
+        m_gbuffer_input_layout = m_device.create_descriptor_set_layout(desc);
+    }
+
+    // Lighting data layout (set 2: LightUBO + PointLightSSBO)
+    {
+        rhi::DescriptorSetLayoutDesc desc;
+        desc.bindings.push_back(
+            rhi::DescriptorBinding::uniform_buffer(0, rhi::ShaderStage::Fragment));
+        desc.bindings.push_back(
+            rhi::DescriptorBinding::storage_buffer(1, rhi::ShaderStage::Fragment));
+        m_lighting_data_layout = m_device.create_descriptor_set_layout(desc);
+    }
+
+    // Composite input layout (set 0: HDR result texture)
+    {
+        rhi::DescriptorSetLayoutDesc desc;
+        desc.bindings.push_back(
+            rhi::DescriptorBinding::sampled_image(0, rhi::ShaderStage::Fragment));
+        m_composite_input_layout = m_device.create_descriptor_set_layout(desc);
+    }
+
+    // =========================================================================
+    // Pipeline Layouts
+    // =========================================================================
+
+    // Geometry pipeline layout: set 0 (camera), set 1 (material), push constants (model)
+    {
+        rhi::PipelineLayoutDesc desc;
+        desc.set_layouts.push_back(m_camera_layout.get());
+        desc.set_layouts.push_back(m_material_layout.get());
+        rhi::PushConstantRange pc_range;
+        pc_range.stages = rhi::ShaderStage::Vertex;
+        pc_range.offset = 0;
+        pc_range.size = sizeof(glm::mat4);
+        desc.push_constant_ranges.push_back(pc_range);
+        m_geometry_layout = m_device.create_pipeline_layout(desc);
+    }
+
+    // Lighting pipeline layout: set 0 (camera), set 1 (GBuffer), set 2 (lights)
+    {
+        rhi::PipelineLayoutDesc desc;
+        desc.set_layouts.push_back(m_camera_layout.get());
+        desc.set_layouts.push_back(m_gbuffer_input_layout.get());
+        desc.set_layouts.push_back(m_lighting_data_layout.get());
+        m_lighting_layout = m_device.create_pipeline_layout(desc);
+    }
+
+    // Composite pipeline layout: set 0 (HDR), push constants (exposure)
+    {
+        rhi::PipelineLayoutDesc desc;
+        desc.set_layouts.push_back(m_composite_input_layout.get());
+        rhi::PushConstantRange pc_range;
+        pc_range.stages = rhi::ShaderStage::Fragment;
+        pc_range.offset = 0;
+        pc_range.size = sizeof(f32);
+        desc.push_constant_ranges.push_back(pc_range);
+        m_composite_layout = m_device.create_pipeline_layout(desc);
+    }
+
+    // =========================================================================
+    // Shader Modules
+    // =========================================================================
+
+    auto vk_geometry_vert = m_device.create_shader_from_file(
+        "assets/shaders/deferred/vk_geometry.vert", rhi::ShaderStage::Vertex, "GeometryVert");
+    auto vk_geometry_frag = m_device.create_shader_from_file(
+        "assets/shaders/deferred/vk_geometry.frag", rhi::ShaderStage::Fragment, "GeometryFrag");
+    auto vk_fullscreen_vert = m_device.create_shader_from_file(
+        "assets/shaders/deferred/vk_fullscreen.vert", rhi::ShaderStage::Vertex, "FullscreenVert");
+    auto vk_lighting_frag = m_device.create_shader_from_file(
+        "assets/shaders/deferred/vk_lighting.frag", rhi::ShaderStage::Fragment, "LightingFrag");
+    auto vk_composite_frag = m_device.create_shader_from_file(
+        "assets/shaders/deferred/vk_composite.frag", rhi::ShaderStage::Fragment, "CompositeFrag");
+
+    if (!vk_geometry_vert || !vk_geometry_frag || !vk_fullscreen_vert || !vk_lighting_frag ||
+        !vk_composite_frag) {
+        HZ_LOG_ERROR("Failed to load one or more shaders");
+        return;
+    }
+
+    // =========================================================================
+    // Geometry Pipeline
+    // =========================================================================
+    {
+        rhi::GraphicsPipelineDesc desc;
+        desc.vertex_shader = vk_geometry_vert.get();
+        desc.fragment_shader = vk_geometry_frag.get();
+        desc.vertex_layout = rhi::VertexInputLayout::standard_vertex();
+        desc.topology = rhi::PrimitiveTopology::TriangleList;
+        desc.rasterization = rhi::RasterizationState::default_state();
+        desc.depth_stencil = rhi::DepthStencilState::default_state();
+        desc.blend = rhi::BlendState::disabled(4);
+        desc.multisample = {};
+        desc.layout = m_geometry_layout.get();
+        m_geometry_pipeline = m_device.create_graphics_pipeline(desc);
+    }
+
+    // =========================================================================
+    // Lighting Pipeline
+    // =========================================================================
+    {
+        rhi::GraphicsPipelineDesc desc;
+        desc.vertex_shader = vk_fullscreen_vert.get();
+        desc.fragment_shader = vk_lighting_frag.get();
+        desc.vertex_layout = rhi::VertexInputLayout::position_uv();
+        desc.topology = rhi::PrimitiveTopology::TriangleStrip;
+        desc.rasterization = rhi::RasterizationState::no_cull();
+        desc.depth_stencil = rhi::DepthStencilState::disabled();
+        desc.blend = rhi::BlendState::disabled(1);
+        desc.multisample = {};
+        desc.layout = m_lighting_layout.get();
+        m_lighting_pipeline = m_device.create_graphics_pipeline(desc);
+    }
+
+    // =========================================================================
+    // Composite Pipeline
+    // =========================================================================
+    {
+        rhi::GraphicsPipelineDesc desc;
+        desc.vertex_shader = vk_fullscreen_vert.get();
+        desc.fragment_shader = vk_composite_frag.get();
+        desc.vertex_layout = rhi::VertexInputLayout::position_uv();
+        desc.topology = rhi::PrimitiveTopology::TriangleStrip;
+        desc.rasterization = rhi::RasterizationState::no_cull();
+        desc.depth_stencil = rhi::DepthStencilState::disabled();
+        desc.blend = rhi::BlendState::disabled(1);
+        desc.multisample = {};
+        desc.layout = m_composite_layout.get();
+        m_composite_pipeline = m_device.create_graphics_pipeline(desc);
+    }
+
+    // =========================================================================
+    // Descriptor Pool & Samplers
+    // =========================================================================
+
+    {
+        rhi::DescriptorPoolDesc desc;
+        desc.max_sets = 8;
+        desc.pool_sizes.push_back({rhi::DescriptorType::UniformBuffer, 4});
+        desc.pool_sizes.push_back({rhi::DescriptorType::StorageBuffer, 2});
+        desc.pool_sizes.push_back({rhi::DescriptorType::CombinedImageSampler, 4});
+        desc.pool_sizes.push_back({rhi::DescriptorType::SampledImage, 8});
+        m_descriptor_pool = m_device.create_descriptor_pool(desc);
+    }
+
+    // Allocate descriptor sets
+    m_camera_set = m_descriptor_pool->allocate(*m_camera_layout);
+    m_gbuffer_input_set = m_descriptor_pool->allocate(*m_gbuffer_input_layout);
+    m_lighting_data_set = m_descriptor_pool->allocate(*m_lighting_data_layout);
+    m_composite_input_set = m_descriptor_pool->allocate(*m_composite_input_layout);
+
+    // Create UBO buffers
+    m_camera_ubo =
+        m_device.create_uniform_buffer(sizeof(glm::mat4) * 4 + sizeof(glm::vec4), "CameraUBO");
+    m_light_ubo = m_device.create_uniform_buffer(sizeof(glm::vec4) * 2 + sizeof(uvec4), "LightUBO");
+
+    // Create samplers
+    {
+        rhi::SamplerDesc desc;
+        desc.min_filter = rhi::Filter::Linear;
+        desc.mag_filter = rhi::Filter::Linear;
+        desc.mipmap_mode = rhi::MipmapMode::Linear;
+        desc.address_mode_u = rhi::AddressMode::Repeat;
+        desc.address_mode_v = rhi::AddressMode::Repeat;
+        desc.address_mode_w = rhi::AddressMode::Repeat;
+        desc.max_anisotropy = 16.0f;
+        m_linear_sampler = m_device.create_sampler(desc, "LinearSampler");
+    }
+
+    {
+        rhi::SamplerDesc desc;
+        desc.min_filter = rhi::Filter::Nearest;
+        desc.mag_filter = rhi::Filter::Nearest;
+        desc.mipmap_mode = rhi::MipmapMode::Nearest;
+        desc.address_mode_u = rhi::AddressMode::ClampToEdge;
+        desc.address_mode_v = rhi::AddressMode::ClampToEdge;
+        desc.address_mode_w = rhi::AddressMode::ClampToEdge;
+        m_nearest_sampler = m_device.create_sampler(desc, "NearestSampler");
+    }
+
+    HZ_LOG_INFO("Deferred renderer pipelines created");
 }
 
 void DeferredRenderer::create_fullscreen_quad() {

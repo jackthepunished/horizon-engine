@@ -386,6 +386,36 @@ private:
     // Fullscreen quad
     std::unique_ptr<rhi::Buffer> m_quad_vb;
 
+    // Pipelines
+    std::unique_ptr<rhi::Pipeline> m_geometry_pipeline;
+    std::unique_ptr<rhi::PipelineLayout> m_geometry_layout;
+    std::unique_ptr<rhi::Pipeline> m_lighting_pipeline;
+    std::unique_ptr<rhi::PipelineLayout> m_lighting_layout;
+    std::unique_ptr<rhi::Pipeline> m_composite_pipeline;
+    std::unique_ptr<rhi::PipelineLayout> m_composite_layout;
+
+    // Descriptor set layouts
+    std::unique_ptr<rhi::DescriptorSetLayout> m_camera_layout;
+    std::unique_ptr<rhi::DescriptorSetLayout> m_material_layout;
+    std::unique_ptr<rhi::DescriptorSetLayout> m_gbuffer_input_layout;
+    std::unique_ptr<rhi::DescriptorSetLayout> m_lighting_data_layout;
+    std::unique_ptr<rhi::DescriptorSetLayout> m_composite_input_layout;
+
+    // Descriptor pool and sets
+    std::unique_ptr<rhi::DescriptorPool> m_descriptor_pool;
+    std::unique_ptr<rhi::DescriptorSet> m_camera_set;
+    std::unique_ptr<rhi::DescriptorSet> m_gbuffer_input_set;
+    std::unique_ptr<rhi::DescriptorSet> m_lighting_data_set;
+    std::unique_ptr<rhi::DescriptorSet> m_composite_input_set;
+
+    // UBO buffers
+    std::unique_ptr<rhi::Buffer> m_camera_ubo;
+    std::unique_ptr<rhi::Buffer> m_light_ubo;
+
+    // Samplers
+    std::unique_ptr<rhi::Sampler> m_linear_sampler;
+    std::unique_ptr<rhi::Sampler> m_nearest_sampler;
+
     // Frustum planes
     std::array<glm::vec4, 6> m_frustum_planes;
 
