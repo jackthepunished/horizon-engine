@@ -44,8 +44,8 @@ struct RenderItem {
     /**
      * @brief Create a RenderItem from a mesh and material
      */
-    static RenderItem from_mesh(const Mesh* mesh, const glm::mat4& transform,
-                                const Material* material = nullptr) {
+    [[nodiscard]] static RenderItem from_mesh(const Mesh* mesh, const glm::mat4& transform,
+                                              const Material* material = nullptr) {
         RenderItem item;
         item.mesh = mesh;
         item.transform = transform;
@@ -56,8 +56,8 @@ struct RenderItem {
     /**
      * @brief Create a RenderItem from a model handle
      */
-    static RenderItem from_model(ModelHandle model, const glm::mat4& transform,
-                                 const Material* material = nullptr) {
+    [[nodiscard]] static RenderItem from_model(ModelHandle model, const glm::mat4& transform,
+                                               const Material* material = nullptr) {
         RenderItem item;
         item.model = model;
         item.transform = transform;

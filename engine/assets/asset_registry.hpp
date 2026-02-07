@@ -40,7 +40,8 @@ public:
     /**
      * @brief Load or get cached texture
      */
-    TextureHandle load_texture(std::string_view path, const TextureParams& params = {});
+    [[nodiscard]] TextureHandle load_texture(std::string_view path,
+                                             const TextureParams& params = {});
 
     /**
      * @brief Get texture by handle
@@ -51,7 +52,7 @@ public:
     /**
      * @brief Reload a texture from disk
      */
-    bool reload_texture(TextureHandle handle);
+    [[nodiscard]] bool reload_texture(TextureHandle handle);
 
     // ========================================================================
     // Model Management
@@ -60,7 +61,7 @@ public:
     /**
      * @brief Load or get cached model
      */
-    ModelHandle load_model(std::string_view path);
+    [[nodiscard]] ModelHandle load_model(std::string_view path);
 
     /**
      * @brief Get model by handle
@@ -71,7 +72,7 @@ public:
     /**
      * @brief Reload a model from disk
      */
-    bool reload_model(ModelHandle handle);
+    [[nodiscard]] bool reload_model(ModelHandle handle);
 
     // ========================================================================
     // Material Management
@@ -80,7 +81,7 @@ public:
     /**
      * @brief Create or get a named material
      */
-    MaterialHandle create_material(const std::string& name, const Material& mat);
+    [[nodiscard]] MaterialHandle create_material(const std::string& name, const Material& mat);
 
     /**
      * @brief Get material by handle
@@ -105,7 +106,7 @@ public:
     /**
      * @brief Load or get cached sound
      */
-    SoundHandle load_sound(const std::string& path, AudioSystem& audio);
+    [[nodiscard]] SoundHandle load_sound(const std::string& path, AudioSystem& audio);
 
     // ========================================================================
     // Utility
@@ -137,17 +138,21 @@ private:
     };
 
     std::vector<AssetSlot<Texture, TextureHandle>> m_textures;
-    std::unordered_map<std::string, u32, TransparentStringHash, std::equal_to<>> m_texture_path_to_index;
+    std::unordered_map<std::string, u32, TransparentStringHash, std::equal_to<>>
+        m_texture_path_to_index;
 
     std::vector<AssetSlot<Model, ModelHandle>> m_models;
-    std::unordered_map<std::string, u32, TransparentStringHash, std::equal_to<>> m_model_path_to_index;
+    std::unordered_map<std::string, u32, TransparentStringHash, std::equal_to<>>
+        m_model_path_to_index;
 
     std::vector<AssetSlot<Material, MaterialHandle>> m_materials;
-    std::unordered_map<std::string, u32, TransparentStringHash, std::equal_to<>> m_material_name_to_index;
+    std::unordered_map<std::string, u32, TransparentStringHash, std::equal_to<>>
+        m_material_name_to_index;
     MaterialHandle m_default_material{};
 
     // Sound cache (path -> handle)
-    std::unordered_map<std::string, SoundHandle, TransparentStringHash, std::equal_to<>> m_loaded_sounds;
+    std::unordered_map<std::string, SoundHandle, TransparentStringHash, std::equal_to<>>
+        m_loaded_sounds;
 };
 
 } // namespace hz

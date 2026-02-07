@@ -81,7 +81,7 @@ struct HitboxComponent {
     /**
      * @brief Get default FPS character hitboxes
      */
-    static HitboxComponent create_humanoid();
+    [[nodiscard]] static HitboxComponent create_humanoid();
 };
 
 /**
@@ -116,8 +116,9 @@ struct HurtboxComponent {
      * @param hitbox The specific hitbox that was hit (for multiplier)
      * @return Actual damage dealt
      */
-    f32 apply_damage(f32 base_damage, HitboxType hit_location, const glm::vec3& damage_direction,
-                     const Hitbox* hitbox = nullptr);
+    [[nodiscard]] f32 apply_damage(f32 base_damage, HitboxType hit_location,
+                                   const glm::vec3& damage_direction,
+                                   const Hitbox* hitbox = nullptr);
 
     /**
      * @brief Heal the entity
@@ -197,9 +198,10 @@ public:
      * @param out_entity Output entity that was hit
      * @return true if a hitbox was hit
      */
-    bool raycast_hitboxes(const glm::vec3& origin, const glm::vec3& direction, f32 max_distance,
-                          entt::registry& registry, RaycastHit& out_hit, Hitbox*& out_hitbox,
-                          entt::entity& out_entity);
+    [[nodiscard]] bool raycast_hitboxes(const glm::vec3& origin, const glm::vec3& direction,
+                                        f32 max_distance, entt::registry& registry,
+                                        RaycastHit& out_hit, Hitbox*& out_hitbox,
+                                        entt::entity& out_entity);
 
 private:
     PhysicsWorld* m_physics_world{nullptr};
@@ -211,7 +213,7 @@ private:
 /**
  * @brief Get default damage multiplier for hitbox type
  */
-inline f32 get_default_damage_multiplier(HitboxType type) {
+[[nodiscard]] inline f32 get_default_damage_multiplier(HitboxType type) {
     switch (type) {
     case HitboxType::Head:
         return 2.0f; // Headshot

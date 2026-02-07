@@ -60,6 +60,16 @@ public:
     [[nodiscard]] usize capacity() const noexcept { return m_buffer.size(); }
 
     /**
+     * @brief Restore the allocation offset to a previous position
+     *
+     * Used by
+     * ScopedArenaMarker to free all allocations made after a marker point.
+     * @param offset The
+     * offset to restore to (must be <= current offset)
+     */
+    void restore(usize offset) noexcept;
+
+    /**
      * @brief Get percentage of arena used
      */
     [[nodiscard]] f32 usage_percent() const noexcept {

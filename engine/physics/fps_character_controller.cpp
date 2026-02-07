@@ -5,6 +5,7 @@
 #include "physics_config.hpp"
 
 #include <cmath>
+#include <limits>
 
 #include <Jolt/Core/TempAllocator.h>
 #include <Jolt/Physics/Collision/Shape/CapsuleShape.h>
@@ -315,6 +316,7 @@ void FPSCharacterController::update_character_height(f32 delta_time) {
     // Smooth height transition
     f32 height_speed = 8.0f; // Units per second
     if (std::abs(m_current_height - m_target_height) > 0.01f) {
+        f32 prev_height = m_current_height;
         f32 height_delta = height_speed * delta_time;
         if (m_current_height < m_target_height) {
             m_current_height = std::min(m_current_height + height_delta, m_target_height);
@@ -322,8 +324,39 @@ void FPSCharacterController::update_character_height(f32 delta_time) {
             m_current_height = std::max(m_current_height - height_delta, m_target_height);
         }
 
-        // TODO: Recreate character shape with new height for proper collision
-        // This is expensive, so we might want to just adjust the position instead
+        // Recreate character shape with new height for proper collision
+        if (m_character && std::abs(m_current_height - prev_height) > 0.001f) {
+            f32 half_height = (m_current_height - 2.0f * m_config.capsule_radius) * 0.5f;
+            half_height = std::max(half_height, 0.01f);
+
+            JPH::CapsuleShapeSettings capsule_settings(half_height, m_config.capsule_radius);
+            JPH::ShapeSettings::ShapeResult shape_result = capsule_settings.Create();
+
+            if (!shape_result.HasError()) {
+                JPH::RotatedTranslatedShapeSettings rtshape_settings(
+                    JPH::Vec3(0, m_current_height * 0.5f, 0), JPH::Quat::sIdentity(),
+                    shape_result.Get());
+
+                JPH::ShapeSettings::ShapeResult final_result = rtshape_settings.Create();
+                if (!final_result.HasError()) {
+                    JPH::TempAllocatorImpl temp_allocator(256 * 1024);
+                    m_character->SetShape(
+                        final_result.Get(), std::numeric_limits<float>::max(),
+                        m_physics_world->jolt_system()->GetDefaultBroadPhaseLayerFilter(
+                            PhysicsLayers::MOVING),
+                        m_physics_world->jolt_system()->GetDefaultLayerFilter(
+                            PhysicsLayers::MOVING),
+                        {}, {}, temp_allocator);
+                }
+            }
+        }
+
+        // When standing up, adjust position upward to prevent clipping through floor
+        if (m_current_height > prev_height) {
+            f32 height_increase = m_current_height - prev_height;
+            m_position.y += height_increase * 0.5f;
+            m_character->SetPosition(JPH::RVec3(m_position.x, m_position.y, m_position.z));
+        }
     }
 }
 

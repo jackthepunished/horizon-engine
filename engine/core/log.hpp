@@ -93,9 +93,6 @@ private:
 #define HZ_ERROR(...) ::hz::Log::app_logger()->error(__VA_ARGS__)
 #define HZ_FATAL(...) ::hz::Log::app_logger()->critical(__VA_ARGS__)
 
-// Utility macros
-#define HZ_UNUSED(x) (void)(x)
-
 // ============================================================================
 // Assertions
 // ============================================================================

@@ -155,9 +155,9 @@ public:
      * @param registry ECS registry
      * @return Hitscan result
      */
-    HitscanResult fire_hitscan(const glm::vec3& origin, const glm::vec3& direction,
-                               const ProjectileData& data, entt::entity owner,
-                               entt::registry& registry);
+    [[nodiscard]] HitscanResult fire_hitscan(const glm::vec3& origin, const glm::vec3& direction,
+                                             const ProjectileData& data, entt::entity owner,
+                                             entt::registry& registry);
 
     /**
      * @brief Spawn a ballistic projectile
@@ -168,9 +168,9 @@ public:
      * @param registry ECS registry
      * @return Created projectile entity
      */
-    entt::entity spawn_ballistic(const glm::vec3& origin, const glm::vec3& direction,
-                                 const ProjectileData& data, entt::entity owner,
-                                 entt::registry& registry);
+    [[nodiscard]] entt::entity spawn_ballistic(const glm::vec3& origin, const glm::vec3& direction,
+                                               const ProjectileData& data, entt::entity owner,
+                                               entt::registry& registry);
 
     /**
      * @brief Set hit callback
@@ -187,7 +187,7 @@ public:
     /**
      * @brief Calculate damage falloff based on distance
      */
-    static f32 calculate_damage_falloff(const ProjectileData& data, f32 distance);
+    [[nodiscard]] static f32 calculate_damage_falloff(const ProjectileData& data, f32 distance);
 
 private:
     void update_ballistic_projectiles(entt::registry& registry, f32 delta_time);
@@ -213,7 +213,7 @@ private:
 
 namespace ProjectileTemplates {
 
-inline ProjectileData pistol_bullet() {
+[[nodiscard]] inline ProjectileData pistol_bullet() {
     ProjectileData data;
     data.name = "9mm";
     data.type = ProjectileType::Hitscan;
@@ -225,7 +225,7 @@ inline ProjectileData pistol_bullet() {
     return data;
 }
 
-inline ProjectileData rifle_bullet() {
+[[nodiscard]] inline ProjectileData rifle_bullet() {
     ProjectileData data;
     data.name = "5.56mm";
     data.type = ProjectileType::Hitscan;
@@ -239,7 +239,7 @@ inline ProjectileData rifle_bullet() {
     return data;
 }
 
-inline ProjectileData sniper_bullet() {
+[[nodiscard]] inline ProjectileData sniper_bullet() {
     ProjectileData data;
     data.name = "7.62mm";
     data.type = ProjectileType::Hitscan;
@@ -253,7 +253,7 @@ inline ProjectileData sniper_bullet() {
     return data;
 }
 
-inline ProjectileData shotgun_pellet() {
+[[nodiscard]] inline ProjectileData shotgun_pellet() {
     ProjectileData data;
     data.name = "12gauge_pellet";
     data.type = ProjectileType::Hitscan;
@@ -265,7 +265,7 @@ inline ProjectileData shotgun_pellet() {
     return data;
 }
 
-inline ProjectileData rocket() {
+[[nodiscard]] inline ProjectileData rocket() {
     ProjectileData data;
     data.name = "rocket";
     data.type = ProjectileType::Ballistic;
@@ -282,7 +282,7 @@ inline ProjectileData rocket() {
     return data;
 }
 
-inline ProjectileData grenade() {
+[[nodiscard]] inline ProjectileData grenade() {
     ProjectileData data;
     data.name = "frag_grenade";
     data.type = ProjectileType::Ballistic;

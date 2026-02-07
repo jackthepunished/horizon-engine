@@ -19,7 +19,7 @@ public:
     /**
      * @brief Deserialize a scene from a file (clears current scene)
      */
-    bool deserialize(const std::filesystem::path& path);
+    [[nodiscard]] bool deserialize(const std::filesystem::path& path);
 
 private:
     Scene& m_scene;

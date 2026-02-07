@@ -48,6 +48,34 @@ TEST_CASE("LinearArena basic operations", "[memory][arena]") {
         void* ptr = arena.allocate(32, 16);
         REQUIRE(reinterpret_cast<uintptr_t>(ptr) % 16 == 0);
     }
+
+    SECTION("ScopedArenaMarker restores offset on destruction") {
+        // Allocate some initial data
+        (void)arena.allocate(100, 8);
+        auto used_before = arena.used();
+        REQUIRE(used_before >= 100);
+
+        {
+            ScopedArenaMarker marker(arena);
+            // Allocate more inside the scoped block
+            (void)arena.allocate(200, 8);
+            (void)arena.allocate(300, 8);
+            REQUIRE(arena.used() > used_before);
+        }
+        // After marker destruction, offset should be restored
+        REQUIRE(arena.used() == used_before);
+    }
+
+    SECTION("ScopedArenaMarker restores to zero when arena was empty") {
+        REQUIRE(arena.used() == 0);
+
+        {
+            ScopedArenaMarker marker(arena);
+            (void)arena.allocate(256, 8);
+            REQUIRE(arena.used() >= 256);
+        }
+        REQUIRE(arena.used() == 0);
+    }
 }
 
 // ============================================================================

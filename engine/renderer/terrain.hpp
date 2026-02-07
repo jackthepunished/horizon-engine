@@ -36,8 +36,8 @@ struct TerrainConfig {
 struct TerrainVertex {
     glm::vec3 position;
     glm::vec3 normal;
-    glm::vec2 texcoord;      // For detail textures (tiled)
-    glm::vec2 splatcoord;    // For splatmap sampling (0-1)
+    glm::vec2 texcoord;   // For detail textures (tiled)
+    glm::vec2 splatcoord; // For splatmap sampling (0-1)
 };
 
 /**
@@ -57,7 +57,8 @@ public:
      * @param config Terrain configuration
      * @return true if successful
      */
-    bool generate_from_heightmap(const std::string& heightmap_path, const TerrainConfig& config);
+    [[nodiscard]] bool generate_from_heightmap(const std::string& heightmap_path,
+                                               const TerrainConfig& config);
 
     /**
      * @brief Generate flat terrain (for testing)
@@ -72,8 +73,8 @@ public:
      * @param octaves Noise octaves (detail levels)
      * @param persistence Amplitude falloff per octave
      */
-    void generate_procedural(const TerrainConfig& config, u32 seed = 0, 
-                             u32 octaves = 4, float persistence = 0.5f);
+    void generate_procedural(const TerrainConfig& config, u32 seed = 0, u32 octaves = 4,
+                             float persistence = 0.5f);
 
     /**
      * @brief Draw the terrain
@@ -101,14 +102,13 @@ public:
     [[nodiscard]] bool is_valid() const { return m_vao != 0; }
 
 private:
-    void calculate_normals(std::vector<TerrainVertex>& vertices, 
-                          const std::vector<u32>& indices, u32 grid_width, u32 grid_depth);
-    void upload_mesh(const std::vector<TerrainVertex>& vertices, 
-                    const std::vector<u32>& indices);
-    
+    void calculate_normals(std::vector<TerrainVertex>& vertices, const std::vector<u32>& indices,
+                           u32 grid_width, u32 grid_depth);
+    void upload_mesh(const std::vector<TerrainVertex>& vertices, const std::vector<u32>& indices);
+
     // Simple noise function for procedural generation
-    static float noise2d(float x, float y, u32 seed);
-    static float perlin2d(float x, float y, u32 seed, u32 octaves, float persistence);
+    [[nodiscard]] static float noise2d(float x, float y, u32 seed);
+    [[nodiscard]] static float perlin2d(float x, float y, u32 seed, u32 octaves, float persistence);
 
     TerrainConfig m_config;
     std::vector<float> m_heightmap_data; // Cached heights for get_height_at()

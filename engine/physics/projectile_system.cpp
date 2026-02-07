@@ -4,6 +4,7 @@
 #include "engine/core/log.hpp"
 #include "engine/scene/components.hpp"
 #include "physics_config.hpp"
+#include "physics_interactions.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -89,9 +90,96 @@ HitscanResult ProjectileSystem::fire_hitscan(const glm::vec3& origin, const glm:
         m_hit_callback(result);
     }
 
-    // Handle penetration
+    // Handle penetration: continue raycasting from exit point with reduced damage
     if (data.max_penetrations > 0 && data.penetration_power > 0.0f) {
-        // TODO: Implement penetration by continuing raycast from exit point
+        glm::vec3 pen_origin = hit.position;
+        glm::vec3 pen_dir = dir;
+        f32 pen_damage = result.final_damage;
+        f32 pen_remaining_range = data.max_range - hit.distance;
+
+        for (u8 pen = 0; pen < data.max_penetrations && pen_remaining_range > 0.0f; ++pen) {
+            // Get material from hit entity (use MaterialComponent if present, else default)
+            PhysicsMaterial material = Materials::concrete();
+            if (hit_entity != entt::null && registry.valid(hit_entity)) {
+                auto* mat_comp = registry.try_get<MaterialComponent>(hit_entity);
+                if (mat_comp) {
+                    material = mat_comp->material;
+                }
+            }
+
+            // Check if the bullet can penetrate this material
+            PenetrationResult pen_result =
+                BulletPenetration::check_penetration(data, hit, material, pen_damage);
+
+            if (!pen_result.can_penetrate) {
+                break;
+            }
+
+            // Calculate exit point and new direction
+            glm::vec3 exit_point = pen_origin + pen_dir * (material.thickness + 0.01f);
+            glm::vec3 exit_dir =
+                BulletPenetration::calculate_exit_direction(pen_dir, hit.normal, material);
+
+            pen_damage = pen_result.remaining_damage;
+            pen_remaining_range -= material.thickness;
+
+            // Raycast from exit point
+            RaycastHit pen_hit;
+            Hitbox* pen_hitbox = nullptr;
+            entt::entity pen_hit_entity = entt::null;
+
+            bool pen_hit_something =
+                m_hitbox_system->raycast_hitboxes(exit_point, exit_dir, pen_remaining_range,
+                                                  registry, pen_hit, pen_hitbox, pen_hit_entity);
+
+            if (!pen_hit_something) {
+                break;
+            }
+
+            // Build result for this penetration hit
+            HitscanResult pen_hitscan;
+            pen_hitscan.hit = true;
+            pen_hitscan.hit_point = pen_hit.position;
+            pen_hitscan.hit_normal = pen_hit.normal;
+            pen_hitscan.distance = hit.distance + material.thickness + pen_hit.distance;
+            pen_hitscan.hit_entity = pen_hit_entity;
+            pen_hitscan.hit_hitbox = pen_hitbox;
+
+            if (pen_hitbox) {
+                pen_hitscan.hit_location = pen_hitbox->type;
+            }
+
+            // Calculate damage with falloff from total distance
+            pen_hitscan.raw_damage = pen_damage;
+            f32 pen_falloff = calculate_damage_falloff(data, pen_hitscan.distance);
+            pen_hitscan.final_damage = pen_damage * pen_falloff;
+
+            if (pen_hitbox) {
+                pen_hitscan.final_damage *= pen_hitbox->damage_multiplier;
+            }
+
+            // Apply damage to penetration target
+            if (pen_hit_entity != entt::null && registry.valid(pen_hit_entity)) {
+                auto* hurtbox = registry.try_get<HurtboxComponent>(pen_hit_entity);
+                if (hurtbox) {
+                    glm::vec3 damage_dir = -exit_dir;
+                    hurtbox->apply_damage(pen_hitscan.final_damage, pen_hitscan.hit_location,
+                                          damage_dir, pen_hitbox);
+                }
+            }
+
+            // Fire hit callback for penetration hit
+            if (m_hit_callback) {
+                m_hit_callback(pen_hitscan);
+            }
+
+            // Set up for next penetration iteration
+            pen_origin = pen_hit.position;
+            pen_dir = exit_dir;
+            pen_damage = pen_hitscan.final_damage;
+            pen_remaining_range -= pen_hit.distance;
+            hit_entity = pen_hit_entity;
+        }
     }
 
     return result;

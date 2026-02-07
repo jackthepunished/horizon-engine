@@ -22,7 +22,7 @@ namespace hz {
  */
 struct SoundHandle {
     u32 id{0};
-    bool is_valid() const { return id != 0; }
+    [[nodiscard]] bool is_valid() const { return id != 0; }
 };
 
 /**
@@ -53,7 +53,7 @@ public:
      * @param path Path to audio file (wav, mp3, flac)
      * @return Handle to the loaded sound
      */
-    SoundHandle load_sound(const std::string& path);
+    [[nodiscard]] SoundHandle load_sound(const std::string& path);
 
     /**
      * @brief Play a sound

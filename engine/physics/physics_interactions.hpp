@@ -71,7 +71,7 @@ struct PhysicsMaterial {
  */
 namespace Materials {
 
-inline PhysicsMaterial wood() {
+[[nodiscard]] inline PhysicsMaterial wood() {
     PhysicsMaterial m;
     m.type = PhysicsMaterialType::Wood;
     m.name = "wood";
@@ -85,7 +85,7 @@ inline PhysicsMaterial wood() {
     return m;
 }
 
-inline PhysicsMaterial metal() {
+[[nodiscard]] inline PhysicsMaterial metal() {
     PhysicsMaterial m;
     m.type = PhysicsMaterialType::Metal;
     m.name = "metal";
@@ -99,7 +99,7 @@ inline PhysicsMaterial metal() {
     return m;
 }
 
-inline PhysicsMaterial glass() {
+[[nodiscard]] inline PhysicsMaterial glass() {
     PhysicsMaterial m;
     m.type = PhysicsMaterialType::Glass;
     m.name = "glass";
@@ -112,7 +112,7 @@ inline PhysicsMaterial glass() {
     return m;
 }
 
-inline PhysicsMaterial concrete() {
+[[nodiscard]] inline PhysicsMaterial concrete() {
     PhysicsMaterial m;
     m.type = PhysicsMaterialType::Concrete;
     m.name = "concrete";
@@ -126,7 +126,7 @@ inline PhysicsMaterial concrete() {
     return m;
 }
 
-inline PhysicsMaterial flesh() {
+[[nodiscard]] inline PhysicsMaterial flesh() {
     PhysicsMaterial m;
     m.type = PhysicsMaterialType::Flesh;
     m.name = "flesh";
@@ -185,7 +185,8 @@ struct DestructibleComponent {
      * @param hit_direction Direction damage came from
      * @return true if destroyed
      */
-    bool apply_damage(f32 damage, const glm::vec3& hit_point, const glm::vec3& hit_direction);
+    [[nodiscard]] bool apply_damage(f32 damage, const glm::vec3& hit_point,
+                                    const glm::vec3& hit_direction);
 };
 
 // ============================================================================
@@ -275,21 +276,23 @@ public:
      * @param current_damage Current bullet damage
      * @return Penetration result
      */
-    static PenetrationResult check_penetration(const ProjectileData& projectile,
-                                               const RaycastHit& hit,
-                                               const PhysicsMaterial& material, f32 current_damage);
+    [[nodiscard]] static PenetrationResult check_penetration(const ProjectileData& projectile,
+                                                             const RaycastHit& hit,
+                                                             const PhysicsMaterial& material,
+                                                             f32 current_damage);
 
     /**
      * @brief Calculate damage after penetration
      */
-    static f32 calculate_exit_damage(f32 entry_damage, const PhysicsMaterial& material);
+    [[nodiscard]] static f32 calculate_exit_damage(f32 entry_damage,
+                                                   const PhysicsMaterial& material);
 
     /**
      * @brief Calculate bullet deviation after penetration
      */
-    static glm::vec3 calculate_exit_direction(const glm::vec3& entry_direction,
-                                              const glm::vec3& surface_normal,
-                                              const PhysicsMaterial& material);
+    [[nodiscard]] static glm::vec3 calculate_exit_direction(const glm::vec3& entry_direction,
+                                                            const glm::vec3& surface_normal,
+                                                            const PhysicsMaterial& material);
 };
 
 // ============================================================================
@@ -338,7 +341,7 @@ public:
      * @brief Try to grab a prop
      * @return true if grab successful
      */
-    bool try_grab(entt::registry& registry, entt::entity grabber, entt::entity prop);
+    [[nodiscard]] bool try_grab(entt::registry& registry, entt::entity grabber, entt::entity prop);
 
     /**
      * @brief Release a grabbed prop
@@ -364,11 +367,10 @@ public:
      * @brief Process bullet hit with penetration
      * @return list of all hit results including penetrations
      */
-    std::vector<HitscanResult> process_bullet_with_penetration(entt::registry& registry,
-                                                               const glm::vec3& origin,
-                                                               const glm::vec3& direction,
-                                                               const ProjectileData& projectile,
-                                                               entt::entity shooter);
+    [[nodiscard]] std::vector<HitscanResult>
+    process_bullet_with_penetration(entt::registry& registry, const glm::vec3& origin,
+                                    const glm::vec3& direction, const ProjectileData& projectile,
+                                    entt::entity shooter);
 
     // =========================================================================
     // Callbacks

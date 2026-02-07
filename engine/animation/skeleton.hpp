@@ -130,7 +130,7 @@ public:
     /**
      * @brief Add a bone to the skeleton
      */
-    i32 add_bone(const std::string& name, i32 parent_id, const glm::mat4& offset);
+    [[nodiscard]] i32 add_bone(const std::string& name, i32 parent_id, const glm::mat4& offset);
 
     /**
      * @brief Get bone by ID

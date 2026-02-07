@@ -30,7 +30,7 @@ public:
     void resize(u32 width, u32 height);
 
     // Returns the texture ID of the blurred SSAO result
-    u32 get_output_texture() const { return m_blur_texture; }
+    [[nodiscard]] u32 get_output_texture() const { return m_blur_texture; }
 
     // Main render function
     void render(u32 g_position, u32 g_normal, const glm::mat4& projection,

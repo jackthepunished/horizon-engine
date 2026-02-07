@@ -8,6 +8,7 @@
 #include "engine/core/types.hpp"
 
 #include <functional>
+#include <memory>
 #include <random>
 #include <vector>
 
@@ -21,14 +22,14 @@ namespace hz {
 struct Particle {
     glm::vec3 position{0.0f};
     glm::vec3 velocity{0.0f};
-    glm::vec4 color{1.0f};        // RGBA
-    glm::vec4 color_end{1.0f};    // Color to fade to
+    glm::vec4 color{1.0f};     // RGBA
+    glm::vec4 color_end{1.0f}; // Color to fade to
     float size{1.0f};
-    float size_end{0.0f};         // Size to shrink/grow to
+    float size_end{0.0f}; // Size to shrink/grow to
     float rotation{0.0f};
     float rotation_speed{0.0f};
-    float life{1.0f};             // Remaining life (0-1)
-    float max_life{1.0f};         // Initial life duration
+    float life{1.0f};     // Remaining life (0-1)
+    float max_life{1.0f}; // Initial life duration
     bool active{false};
 };
 
@@ -47,18 +48,18 @@ struct ParticleInstanceData {
  */
 struct ParticleEmitterConfig {
     // Emission settings
-    glm::vec3 position{0.0f};           // Emitter world position
-    glm::vec3 position_variance{0.0f};  // Random offset from position
-    u32 max_particles{1000};            // Maximum particles in pool
-    float emit_rate{50.0f};             // Particles per second
-    bool burst_mode{false};             // Emit all at once
-    
+    glm::vec3 position{0.0f};          // Emitter world position
+    glm::vec3 position_variance{0.0f}; // Random offset from position
+    u32 max_particles{1000};           // Maximum particles in pool
+    float emit_rate{50.0f};            // Particles per second
+    bool burst_mode{false};            // Emit all at once
+
     // Velocity
-    glm::vec3 velocity{0.0f, 1.0f, 0.0f};   // Initial velocity
-    glm::vec3 velocity_variance{0.5f};       // Random velocity variation
-    glm::vec3 gravity{0.0f, -9.8f, 0.0f};   // Gravity acceleration
-    float drag{0.0f};                        // Air resistance
-    
+    glm::vec3 velocity{0.0f, 1.0f, 0.0f}; // Initial velocity
+    glm::vec3 velocity_variance{0.5f};    // Random velocity variation
+    glm::vec3 gravity{0.0f, -9.8f, 0.0f}; // Gravity acceleration
+    float drag{0.0f};                     // Air resistance
+
     // Appearance
     glm::vec4 color_start{1.0f, 1.0f, 1.0f, 1.0f}; // Starting color
     glm::vec4 color_end{1.0f, 1.0f, 1.0f, 0.0f};   // Ending color (fades)
@@ -66,13 +67,13 @@ struct ParticleEmitterConfig {
     float size_end{0.0f};
     float rotation_speed{0.0f};
     float rotation_variance{0.0f};
-    
+
     // Lifetime
     float life_min{1.0f};
     float life_max{2.0f};
-    
+
     // Blend mode
-    bool additive_blend{false};  // true for fire/glow effects
+    bool additive_blend{false}; // true for fire/glow effects
 };
 
 /**
@@ -154,20 +155,20 @@ private:
     void create_quad_mesh();
     void upload_instance_data();
     void emit_particle();
-    
+
     [[nodiscard]] float random_range(float min, float max);
     [[nodiscard]] glm::vec3 random_vec3(const glm::vec3& variance);
 
     ParticleEmitterConfig m_config;
     std::vector<Particle> m_particles;
     std::vector<ParticleInstanceData> m_instance_data;
-    
+
     bool m_emitting{true};
     float m_emit_accumulator{0.0f};
     u32 m_active_count{0};
-    
+
     std::mt19937 m_rng;
-    
+
     // OpenGL buffers
     u32 m_vao{0};
     u32 m_quad_vbo{0};     // Quad vertices
@@ -187,7 +188,7 @@ public:
      * @param config Emitter configuration
      * @return Emitter ID
      */
-    u32 create_emitter(const ParticleEmitterConfig& config);
+    [[nodiscard]] u32 create_emitter(const ParticleEmitterConfig& config);
 
     /**
      * @brief Get emitter by ID
@@ -227,13 +228,13 @@ namespace ParticlePresets {
 /**
  * @brief Fire/flame effect
  */
-inline ParticleEmitterConfig fire() {
+[[nodiscard]] inline ParticleEmitterConfig fire() {
     ParticleEmitterConfig cfg;
     cfg.max_particles = 500;
     cfg.emit_rate = 100.0f;
     cfg.velocity = glm::vec3(0.0f, 3.0f, 0.0f);
     cfg.velocity_variance = glm::vec3(0.5f, 1.0f, 0.5f);
-    cfg.gravity = glm::vec3(0.0f, 2.0f, 0.0f); // Rises
+    cfg.gravity = glm::vec3(0.0f, 2.0f, 0.0f);           // Rises
     cfg.color_start = glm::vec4(1.0f, 0.8f, 0.2f, 1.0f); // Yellow-orange
     cfg.color_end = glm::vec4(1.0f, 0.2f, 0.0f, 0.0f);   // Red, fade out
     cfg.size_start = 0.5f;
@@ -247,7 +248,7 @@ inline ParticleEmitterConfig fire() {
 /**
  * @brief Smoke effect
  */
-inline ParticleEmitterConfig smoke() {
+[[nodiscard]] inline ParticleEmitterConfig smoke() {
     ParticleEmitterConfig cfg;
     cfg.max_particles = 300;
     cfg.emit_rate = 30.0f;
@@ -268,7 +269,7 @@ inline ParticleEmitterConfig smoke() {
 /**
  * @brief Sparkles/magic effect
  */
-inline ParticleEmitterConfig sparkles() {
+[[nodiscard]] inline ParticleEmitterConfig sparkles() {
     ParticleEmitterConfig cfg;
     cfg.max_particles = 200;
     cfg.emit_rate = 50.0f;
@@ -291,7 +292,7 @@ inline ParticleEmitterConfig sparkles() {
 /**
  * @brief Water splash effect
  */
-inline ParticleEmitterConfig splash() {
+[[nodiscard]] inline ParticleEmitterConfig splash() {
     ParticleEmitterConfig cfg;
     cfg.max_particles = 100;
     cfg.emit_rate = 0.0f; // Burst only
@@ -312,7 +313,7 @@ inline ParticleEmitterConfig splash() {
 /**
  * @brief Rain effect (falling particles)
  */
-inline ParticleEmitterConfig rain() {
+[[nodiscard]] inline ParticleEmitterConfig rain() {
     ParticleEmitterConfig cfg;
     cfg.max_particles = 2000;
     cfg.emit_rate = 500.0f;

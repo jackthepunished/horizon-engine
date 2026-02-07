@@ -55,7 +55,7 @@ struct PhysicsBodyID {
     JPH::BodyID id;
 
     [[nodiscard]] bool is_valid() const { return !id.IsInvalid(); }
-    static PhysicsBodyID invalid() { return {JPH::BodyID()}; }
+    [[nodiscard]] static PhysicsBodyID invalid() { return {JPH::BodyID()}; }
 };
 
 /**
@@ -80,16 +80,18 @@ public:
     HZ_NON_COPYABLE(PhysicsWorld);
     HZ_NON_MOVABLE(PhysicsWorld);
 
-    bool init();
+    [[nodiscard]] bool init();
     void shutdown();
     void update(f32 delta_time);
 
-    PhysicsBodyID create_static_box(const glm::vec3& position, const glm::vec3& half_extents);
-    PhysicsBodyID create_dynamic_box(const glm::vec3& position, const glm::vec3& half_extents,
-                                     f32 mass = 1.0f);
-    PhysicsBodyID create_dynamic_sphere(const glm::vec3& position, f32 radius, f32 mass = 1.0f);
-    PhysicsBodyID create_dynamic_capsule(const glm::vec3& position, f32 half_height, f32 radius,
-                                         f32 mass = 1.0f);
+    [[nodiscard]] PhysicsBodyID create_static_box(const glm::vec3& position,
+                                                  const glm::vec3& half_extents);
+    [[nodiscard]] PhysicsBodyID create_dynamic_box(const glm::vec3& position,
+                                                   const glm::vec3& half_extents, f32 mass = 1.0f);
+    [[nodiscard]] PhysicsBodyID create_dynamic_sphere(const glm::vec3& position, f32 radius,
+                                                      f32 mass = 1.0f);
+    [[nodiscard]] PhysicsBodyID create_dynamic_capsule(const glm::vec3& position, f32 half_height,
+                                                       f32 radius, f32 mass = 1.0f);
     void remove_body(PhysicsBodyID body_id);
 
     [[nodiscard]] glm::vec3 get_body_position(PhysicsBodyID body_id) const;

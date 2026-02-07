@@ -130,6 +130,36 @@ vec3 calculate_point_light(PointLight light, vec3 normal, vec3 frag_pos, vec3 vi
     return (diffuse + specular) * attenuation;
 }
 
+vec3 calculate_spot_light(SpotLight light, vec3 normal, vec3 frag_pos, vec3 view_dir, vec3 material_diffuse, vec3 material_specular) {
+    vec3 light_dir = normalize(light.position - frag_pos);
+
+    // Spotlight cone: angle between light direction and fragment direction
+    float theta = dot(light_dir, normalize(-light.direction));
+    float epsilon = light.cut_off - light.outer_cut_off;
+    float spot_intensity = clamp((theta - light.outer_cut_off) / epsilon, 0.0, 1.0);
+
+    // Early out if outside the cone
+    if (spot_intensity <= 0.0)
+        return vec3(0.0);
+
+    // Diffuse
+    float diff = max(dot(normal, light_dir), 0.0);
+
+    // Specular
+    vec3 reflect_dir = reflect(-light_dir, normal);
+    float spec = pow(max(dot(view_dir, reflect_dir), 0.0), u_shininess);
+
+    // Attenuation (distance-based, same as point light)
+    float distance = length(light.position - frag_pos);
+    float attenuation = clamp(1.0 - (distance / light.range), 0.0, 1.0);
+    attenuation *= attenuation;
+
+    vec3 diffuse = light.color * light.intensity * diff * material_diffuse;
+    vec3 specular = light.color * light.intensity * spec * material_specular;
+
+    return (diffuse + specular) * attenuation * spot_intensity;
+}
+
 void main() {
     // Texture Color
     vec4 tex_color = texture(u_diffuse_map, v_texcoord);
@@ -163,7 +193,10 @@ void main() {
         result += calculate_point_light(u_point_lights[i], norm, v_frag_pos, view_dir, material_diffuse, material_specular);
     }
     
-    // Spot Lights (TODO)
+    // Spot Lights
+    for(int i = 0; i < u_spot_light_count; ++i) {
+        result += calculate_spot_light(u_spot_lights[i], norm, v_frag_pos, view_dir, material_diffuse, material_specular);
+    }
     
     // Gamma correction
     // result = pow(result, vec3(1.0/2.2)); 

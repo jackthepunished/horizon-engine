@@ -22,7 +22,7 @@ public:
     /**
      * @brief Create a new entity
      */
-    Entity create_entity() { return m_registry.create(); }
+    [[nodiscard]] Entity create_entity() { return m_registry.create(); }
 
     /**
      * @brief Destroy an entity
@@ -32,8 +32,8 @@ public:
     /**
      * @brief Get the underlying registry
      */
-    entt::registry& registry() { return m_registry; }
-    const entt::registry& registry() const { return m_registry; }
+    [[nodiscard]] entt::registry& registry() { return m_registry; }
+    [[nodiscard]] const entt::registry& registry() const { return m_registry; }
 
     /**
      * @brief Clear the scene
@@ -43,7 +43,7 @@ public:
     /**
      * @brief Get active entity count
      */
-    size_t entity_count() const {
+    [[nodiscard]] size_t entity_count() const {
         // EnTT storage<Entity>() returns a pointer in some versions/const contexts
         if (auto* storage = m_registry.storage<Entity>()) {
             return storage->size();
@@ -54,7 +54,7 @@ public:
     /**
      * @brief Check if entity is valid
      */
-    bool is_valid(Entity entity) const { return m_registry.valid(entity); }
+    [[nodiscard]] bool is_valid(Entity entity) const { return m_registry.valid(entity); }
 
 private:
     entt::registry m_registry;

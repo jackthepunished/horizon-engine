@@ -32,6 +32,11 @@ void LinearArena::reset() noexcept {
     m_offset = 0;
 }
 
+void LinearArena::restore(usize offset) noexcept {
+    HZ_ASSERT(offset <= m_offset, "Cannot restore to offset beyond current position");
+    m_offset = offset;
+}
+
 void* LinearArena::do_allocate(usize bytes, usize alignment) {
     // Align the current offset
     usize aligned_offset = (m_offset + alignment - 1) & ~(alignment - 1);
@@ -120,11 +125,10 @@ void MemoryContext::log_stats() {
 ScopedArenaMarker::ScopedArenaMarker(LinearArena& arena) : m_arena(arena), m_marker(arena.used()) {}
 
 ScopedArenaMarker::~ScopedArenaMarker() {
-    // This is a simplified reset - in practice we'd need to track the marker
-    // For now, we just log if there were allocations
     if (m_arena.used() > m_marker) {
         HZ_ENGINE_TRACE("ScopedArenaMarker: freed {} bytes", m_arena.used() - m_marker);
     }
+    m_arena.restore(m_marker);
 }
 
 } // namespace hz
