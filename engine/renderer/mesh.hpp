@@ -2,11 +2,15 @@
 
 /**
  * @file mesh.hpp
- * @brief Basic mesh class
+ * @brief Basic mesh class with RHI GPU buffer management
  */
 
 #include "engine/core/types.hpp"
+#include "engine/rhi/rhi_command_list.hpp"
+#include "engine/rhi/rhi_device.hpp"
+#include "engine/rhi/rhi_resources.hpp"
 
+#include <memory>
 #include <vector>
 
 #include <glm/glm.hpp>
@@ -54,7 +58,11 @@ struct Vertex {
 };
 
 /**
- * @brief Basic mesh class
+ * @brief Basic mesh class with GPU buffer management
+ *
+ * CPU vertex/index data is stored for geometry queries. Call upload_to_gpu()
+ * after construction to create device-local vertex and index buffers.
+ * Then use draw() with a CommandList to issue draw calls.
  */
 class Mesh {
 public:
@@ -64,25 +72,72 @@ public:
     HZ_NON_COPYABLE(Mesh);
     HZ_DEFAULT_MOVABLE(Mesh);
 
+    // =========================================================================
+    // GPU Resource Management
+    // =========================================================================
+
     /**
-     * @brief Draw the mesh (Placeholder)
+     * @brief Upload vertex/index data to GPU-local buffers
+     * @param device RHI device to create buffers on
+     * @param debug_name Optional name for GPU debuggers
      */
-    void draw() const;
+    void upload_to_gpu(rhi::Device& device, const char* debug_name = nullptr);
+
+    /**
+     * @brief Check if GPU buffers have been created
+     */
+    [[nodiscard]] bool is_uploaded() const { return m_vertex_buffer != nullptr; }
+
+    /**
+     * @brief Release GPU buffers
+     */
+    void release_gpu_resources();
+
+    // =========================================================================
+    // Drawing
+    // =========================================================================
+
+    /**
+     * @brief Bind vertex/index buffers and issue an indexed draw call
+     * @param cmd Command list to record into
+     * @note Requires upload_to_gpu() to have been called first
+     */
+    void draw(rhi::CommandList& cmd) const;
+
+    /**
+     * @brief Bind buffers and draw multiple instances
+     * @param cmd Command list to record into
+     * @param instance_count Number of instances to draw
+     */
+    void draw_instanced(rhi::CommandList& cmd, u32 instance_count) const;
+
+    // =========================================================================
+    // Primitive Factory Methods
+    // =========================================================================
 
     [[nodiscard]] static Mesh create_plane(f32 size = 20.0f, i32 subdivisions = 10);
     [[nodiscard]] static Mesh create_cube(f32 size = 1.0f);
-    [[nodiscard]] static Mesh create_sphere(f32 radius, i32 slices = 32, i32 stacks = 16);
+    [[nodiscard]] static Mesh create_sphere(f32 radius = 1.0f, i32 slices = 32, i32 stacks = 16);
 
-    void setup_instancing(const std::vector<glm::mat4>& instance_transforms);
-    void draw_instanced(u32 instance_count) const;
+    // =========================================================================
+    // Accessors
+    // =========================================================================
 
     [[nodiscard]] const std::vector<Vertex>& vertices() const { return m_vertices; }
     [[nodiscard]] const std::vector<u32>& indices() const { return m_indices; }
+    [[nodiscard]] u32 index_count() const { return static_cast<u32>(m_indices.size()); }
+    [[nodiscard]] u32 vertex_count() const { return static_cast<u32>(m_vertices.size()); }
+
+    [[nodiscard]] rhi::Buffer* vertex_buffer() const { return m_vertex_buffer.get(); }
+    [[nodiscard]] rhi::Buffer* index_buffer() const { return m_index_buffer.get(); }
 
 private:
     std::vector<Vertex> m_vertices;
     std::vector<u32> m_indices;
-    // GPU resources removed for decoupling
+
+    // GPU buffers (created by upload_to_gpu)
+    std::unique_ptr<rhi::Buffer> m_vertex_buffer;
+    std::unique_ptr<rhi::Buffer> m_index_buffer;
 };
 
 } // namespace hz
