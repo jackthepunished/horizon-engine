@@ -33,6 +33,8 @@ option(HZ_HEADLESS "Build in headless mode (no GPU/window)" OFF)
 # Compiler Warnings
 # ============================================================================
 
+option(WERROR "Treat warnings as errors" OFF)
+
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
     add_compile_options(
         -Wall -Wextra -Wpedantic
@@ -41,6 +43,10 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
         -Wshadow
         -Wnon-virtual-dtor
     )
+    if(WERROR)
+        add_compile_options(-Werror)
+    endif()
+
     if(CMAKE_BUILD_TYPE STREQUAL "Debug")
         add_compile_options(-g -O0)
         add_compile_definitions(HZ_DEBUG=1)
@@ -49,7 +55,11 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
         add_compile_definitions(HZ_RELEASE=1)
     endif()
 elseif(MSVC)
-    add_compile_options(/W4 /WX /permissive-)
+    add_compile_options(/W4 /permissive-)
+    if(WERROR)
+        add_compile_options(/WX)
+    endif()
+
     if(CMAKE_BUILD_TYPE STREQUAL "Debug")
         add_compile_definitions(HZ_DEBUG=1)
     else()

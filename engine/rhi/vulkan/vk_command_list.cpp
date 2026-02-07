@@ -17,16 +17,20 @@ namespace hz::rhi::vk {
 // Constructor / Destructor
 // ============================================================================
 
-VulkanCommandList::VulkanCommandList(VulkanDevice& device, QueueType queue_type)
-    : m_device(device), m_queue_type(queue_type) {
+VulkanCommandList::VulkanCommandList(VulkanDevice& device, QueueType queue_type, VkCommandPool pool)
+    : m_device(device), m_queue_type(queue_type), m_command_pool(pool) {
 
-    // Create command pool for this command list
-    VkCommandPoolCreateInfo pool_info{};
-    pool_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-    pool_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-    pool_info.queueFamilyIndex = m_device.get_queue_family(queue_type);
+    if (m_command_pool == VK_NULL_HANDLE) {
+        // Create command pool for this command list if none provided
+        VkCommandPoolCreateInfo pool_info{};
+        pool_info.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+        pool_info.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+        pool_info.queueFamilyIndex = m_device.get_queue_family(queue_type);
 
-    VK_CHECK_FATAL(vkCreateCommandPool(m_device.device(), &pool_info, nullptr, &m_command_pool));
+        VK_CHECK_FATAL(
+            vkCreateCommandPool(m_device.device(), &pool_info, nullptr, &m_command_pool));
+        m_owns_pool = true;
+    }
 
     // Allocate command buffer
     VkCommandBufferAllocateInfo alloc_info{};
@@ -39,8 +43,7 @@ VulkanCommandList::VulkanCommandList(VulkanDevice& device, QueueType queue_type)
 }
 
 VulkanCommandList::~VulkanCommandList() {
-    if (m_command_pool != VK_NULL_HANDLE) {
-        // Command buffers are freed implicitly when pool is destroyed
+    if (m_owns_pool && m_command_pool != VK_NULL_HANDLE) {
         vkDestroyCommandPool(m_device.device(), m_command_pool, nullptr);
     }
 }
@@ -284,6 +287,83 @@ void VulkanCommandList::end_render_pass() {
 void VulkanCommandList::next_subpass() {
     HZ_ASSERT(m_inside_render_pass, "Not inside a render pass");
     vkCmdNextSubpass(m_command_buffer, VK_SUBPASS_CONTENTS_INLINE);
+}
+
+// ============================================================================
+// Dynamic Rendering (Vulkan 1.3)
+// ============================================================================
+
+void VulkanCommandList::begin_rendering(const RenderingInfo& info) {
+    HZ_ASSERT(m_is_recording, "Command list is not recording");
+    HZ_ASSERT(!m_inside_render_pass, "Already inside a render pass");
+
+    // Build color attachments
+    std::vector<VkRenderingAttachmentInfo> vk_color_attachments;
+    vk_color_attachments.reserve(info.color_attachments.size());
+
+    for (const auto& att : info.color_attachments) {
+        VkRenderingAttachmentInfo vk_att{};
+        vk_att.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+        vk_att.imageView = att.view ? static_cast<const VulkanTextureView*>(att.view)->image_view()
+                                    : VK_NULL_HANDLE;
+        vk_att.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        vk_att.resolveMode = att.resolve_view ? VK_RESOLVE_MODE_AVERAGE_BIT : VK_RESOLVE_MODE_NONE;
+        vk_att.resolveImageView =
+            att.resolve_view ? static_cast<const VulkanTextureView*>(att.resolve_view)->image_view()
+                             : VK_NULL_HANDLE;
+        vk_att.resolveImageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        vk_att.loadOp = to_vk_load_op(att.load_op);
+        vk_att.storeOp = to_vk_store_op(att.store_op);
+
+        if (std::holds_alternative<ClearColor>(att.clear_value)) {
+            const auto& c = std::get<ClearColor>(att.clear_value);
+            vk_att.clearValue.color.float32[0] = c.r;
+            vk_att.clearValue.color.float32[1] = c.g;
+            vk_att.clearValue.color.float32[2] = c.b;
+            vk_att.clearValue.color.float32[3] = c.a;
+        }
+
+        vk_color_attachments.push_back(vk_att);
+    }
+
+    // Optional depth attachment
+    VkRenderingAttachmentInfo vk_depth_attachment{};
+    if (info.depth_attachment && info.depth_attachment->view) {
+        vk_depth_attachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO;
+        vk_depth_attachment.imageView =
+            static_cast<const VulkanTextureView*>(info.depth_attachment->view)->image_view();
+        vk_depth_attachment.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+        vk_depth_attachment.loadOp = to_vk_load_op(info.depth_attachment->load_op);
+        vk_depth_attachment.storeOp = to_vk_store_op(info.depth_attachment->store_op);
+
+        if (std::holds_alternative<ClearDepthStencil>(info.depth_attachment->clear_value)) {
+            const auto& ds = std::get<ClearDepthStencil>(info.depth_attachment->clear_value);
+            vk_depth_attachment.clearValue.depthStencil.depth = ds.depth;
+            vk_depth_attachment.clearValue.depthStencil.stencil = ds.stencil;
+        }
+    }
+
+    VkRenderingInfo vk_info{};
+    vk_info.sType = VK_STRUCTURE_TYPE_RENDERING_INFO;
+    vk_info.renderArea.offset = {info.render_area.x, info.render_area.y};
+    vk_info.renderArea.extent = {info.render_area.width, info.render_area.height};
+    vk_info.layerCount = info.layer_count;
+    vk_info.viewMask = info.view_mask;
+    vk_info.colorAttachmentCount = static_cast<u32>(vk_color_attachments.size());
+    vk_info.pColorAttachments = vk_color_attachments.data();
+    vk_info.pDepthAttachment =
+        (info.depth_attachment && info.depth_attachment->view) ? &vk_depth_attachment : nullptr;
+    vk_info.pStencilAttachment = nullptr; // TODO: separate stencil support
+
+    vkCmdBeginRendering(m_command_buffer, &vk_info);
+    m_inside_render_pass = true; // Reuse flag for dynamic rendering too
+}
+
+void VulkanCommandList::end_rendering() {
+    HZ_ASSERT(m_inside_render_pass, "Not inside dynamic rendering");
+
+    vkCmdEndRendering(m_command_buffer);
+    m_inside_render_pass = false;
 }
 
 // ============================================================================

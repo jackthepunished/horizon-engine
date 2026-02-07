@@ -899,17 +899,28 @@ void VulkanDevice::reset_fences(std::span<Fence* const> fences) {
 // ============================================================================
 
 void VulkanDevice::set_debug_name(u64 handle, const char* name) {
+    // If we only have handle and name, we don't know the VkObjectType.
+    // In Vulkan, pNameInfo->objectType must not be VK_OBJECT_TYPE_UNKNOWN.
+    // We'll leave this empty to avoid validation errors, or implement a lookup table if needed.
+    // For now, internal RHI resources should call set_vk_debug_name directly.
+    HZ_UNUSED(handle);
+    HZ_UNUSED(name);
+}
+
+void VulkanDevice::set_vk_debug_name(u64 handle, VkObjectType type, const char* name) {
     if (!m_validation_enabled || handle == 0 || name == nullptr) {
         return;
     }
 
     VkDebugUtilsObjectNameInfoEXT name_info{};
     name_info.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
-    name_info.objectType = VK_OBJECT_TYPE_UNKNOWN; // Would need to know the type
+    name_info.objectType = type;
     name_info.objectHandle = handle;
     name_info.pObjectName = name;
 
-    vkSetDebugUtilsObjectNameEXT(m_device, &name_info);
+    if (vkSetDebugUtilsObjectNameEXT) {
+        vkSetDebugUtilsObjectNameEXT(m_device, &name_info);
+    }
 }
 
 // ============================================================================
@@ -980,7 +991,9 @@ std::unique_ptr<Swapchain> VulkanDevice::create_swapchain(const SwapchainDesc& d
 }
 
 std::unique_ptr<CommandList> VulkanDevice::create_command_list(QueueType queue_type) {
-    return std::make_unique<VulkanCommandList>(*this, queue_type);
+    auto pool = (queue_type == QueueType::Graphics) ? m_frames[m_current_frame].command_pool
+                                                    : VK_NULL_HANDLE;
+    return std::make_unique<VulkanCommandList>(*this, queue_type, pool);
 }
 
 void VulkanDevice::update_buffer(Buffer& buffer, const void* data, u64 size, u64 offset) {

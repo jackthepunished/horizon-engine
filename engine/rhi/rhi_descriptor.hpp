@@ -12,6 +12,7 @@
 #include "rhi_resources.hpp"
 #include "rhi_types.hpp"
 
+#include <memory>
 #include <vector>
 
 namespace hz::rhi {

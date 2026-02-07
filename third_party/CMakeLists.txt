@@ -135,6 +135,48 @@ FetchContent_Declare(
 )
 
 # ============================================================================
+# Shaderc & Dependencies
+# ============================================================================
+
+# SPIRV-Headers
+FetchContent_Declare(
+    spirv_headers
+    GIT_REPOSITORY https://github.com/KhronosGroup/SPIRV-Headers.git
+    GIT_TAG 8b246ff75c6615ba4532fe4fde20f1be090c3764
+    GIT_SHALLOW TRUE
+)
+
+# SPIRV-Tools
+set(SPIRV_SKIP_TESTS ON CACHE BOOL "" FORCE)
+FetchContent_Declare(
+    spirv_tools
+    GIT_REPOSITORY https://github.com/KhronosGroup/SPIRV-Tools.git
+    GIT_TAG 04896c462d9f3f504c99a4698605b6524af813c1
+    GIT_SHALLOW TRUE
+)
+
+# glslang
+set(GLSLANG_TESTS OFF CACHE BOOL "" FORCE)
+FetchContent_Declare(
+    glslang
+    GIT_REPOSITORY https://github.com/KhronosGroup/glslang.git
+    GIT_TAG d73712b8f6c9047b09e99614e20d456d5ada2390
+    GIT_SHALLOW TRUE
+)
+
+# shaderc
+set(SHADERC_SKIP_TESTS ON CACHE BOOL "" FORCE)
+set(SHADERC_SKIP_EXAMPLES ON CACHE BOOL "" FORCE)
+set(SHADERC_SKIP_INSTALL ON CACHE BOOL "" FORCE)
+
+FetchContent_Declare(
+    shaderc
+    GIT_REPOSITORY https://github.com/google/shaderc.git
+    GIT_TAG v2024.0
+    GIT_SHALLOW TRUE
+)
+
+# ============================================================================
 # volk - Vulkan Loader (meta-loader for Vulkan functions)
 # ============================================================================
 
@@ -163,7 +205,7 @@ endif()
 # Make All Available
 # ============================================================================
 
-FetchContent_MakeAvailable(glfw spdlog stb tinyobjloader JoltPhysics imgui miniaudio entt VulkanMemoryAllocator volk)
+FetchContent_MakeAvailable(glfw spdlog stb tinyobjloader JoltPhysics imgui miniaudio entt VulkanMemoryAllocator volk spirv_headers spirv_tools glslang shaderc)
 
 # Manually setup GLM to avoid its deprecated CMakeLists.txt
 FetchContent_GetProperties(glm)

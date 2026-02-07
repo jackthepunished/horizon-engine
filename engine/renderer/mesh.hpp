@@ -2,11 +2,10 @@
 
 /**
  * @file mesh.hpp
- * @brief Basic mesh class for OpenGL rendering
+ * @brief Basic mesh class
  */
 
 #include "engine/core/types.hpp"
-#include "opengl/buffer.hpp"
 
 #include <vector>
 
@@ -41,7 +40,6 @@ struct Vertex {
                 return;
             }
         }
-        // All slots full - could replace lowest weight
     }
 
     /**
@@ -56,7 +54,7 @@ struct Vertex {
 };
 
 /**
- * @brief Basic mesh class with VAO/VBO/EBO
+ * @brief Basic mesh class
  */
 class Mesh {
 public:
@@ -67,42 +65,24 @@ public:
     HZ_DEFAULT_MOVABLE(Mesh);
 
     /**
-     * @brief Draw the mesh
+     * @brief Draw the mesh (Placeholder)
      */
     void draw() const;
 
-    /**
-     * @brief Create a ground plane mesh
-     */
-    static Mesh create_plane(f32 size = 20.0f, i32 subdivisions = 10);
+    [[nodiscard]] static Mesh create_plane(f32 size = 20.0f, i32 subdivisions = 10);
+    [[nodiscard]] static Mesh create_cube(f32 size = 1.0f);
+    [[nodiscard]] static Mesh create_sphere(f32 radius, i32 slices = 32, i32 stacks = 16);
 
-    /**
-     * @brief Create a cube mesh
-     */
-    static Mesh create_cube(f32 size = 1.0f);
-
-    /**
-     * @brief Create a sphere mesh
-     */
-    static Mesh create_sphere(f32 radius, i32 slices = 32, i32 stacks = 16);
-
-    /**
-     * @brief Setup instance buffer for instanced rendering
-     */
     void setup_instancing(const std::vector<glm::mat4>& instance_transforms);
-
-    /**
-     * @brief Draw the mesh instanced
-     */
     void draw_instanced(u32 instance_count) const;
 
+    [[nodiscard]] const std::vector<Vertex>& vertices() const { return m_vertices; }
+    [[nodiscard]] const std::vector<u32>& indices() const { return m_indices; }
+
 private:
-    gl::VertexArray m_vao;
-    gl::VertexBuffer m_vbo;
-    gl::IndexBuffer m_ebo;
-    gl::VertexBuffer m_instance_vbo; // For instancing
-    u32 m_index_count{0};
-    u32 m_instance_count{0};
+    std::vector<Vertex> m_vertices;
+    std::vector<u32> m_indices;
+    // GPU resources removed for decoupling
 };
 
 } // namespace hz

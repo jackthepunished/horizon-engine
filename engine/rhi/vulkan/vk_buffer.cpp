@@ -46,7 +46,8 @@ VulkanBuffer::VulkanBuffer(VulkanDevice& device, const BufferDesc& desc)
 
     // Set debug name
     if (desc.debug_name) {
-        m_device.set_debug_name(reinterpret_cast<u64>(m_buffer), desc.debug_name);
+        m_device.set_vk_debug_name(reinterpret_cast<u64>(m_buffer), VK_OBJECT_TYPE_BUFFER,
+                                   desc.debug_name);
     }
 
     // Upload initial data if provided

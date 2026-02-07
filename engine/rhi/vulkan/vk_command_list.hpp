@@ -28,8 +28,10 @@ public:
      * @brief Create a command list for a specific queue type
      * @param device The Vulkan device
      * @param queue_type Type of queue this command list will be submitted to
+     * @param pool Optional command pool to allocate from. If null, a new pool is created and owned.
      */
-    VulkanCommandList(VulkanDevice& device, QueueType queue_type);
+    VulkanCommandList(VulkanDevice& device, QueueType queue_type,
+                      VkCommandPool pool = VK_NULL_HANDLE);
     ~VulkanCommandList() override;
 
     // ========================================================================
@@ -61,6 +63,13 @@ public:
     void begin_render_pass(const RenderPassBeginInfo& info) override;
     void end_render_pass() override;
     void next_subpass() override;
+
+    // ========================================================================
+    // Dynamic Rendering Commands (Vulkan 1.3)
+    // ========================================================================
+
+    void begin_rendering(const RenderingInfo& info) override;
+    void end_rendering() override;
 
     // ========================================================================
     // Pipeline Binding
@@ -199,6 +208,7 @@ private:
     VkCommandBuffer m_command_buffer{VK_NULL_HANDLE};
 
     QueueType m_queue_type{QueueType::Graphics};
+    bool m_owns_pool{false};
     bool m_is_recording{false};
     bool m_inside_render_pass{false};
 

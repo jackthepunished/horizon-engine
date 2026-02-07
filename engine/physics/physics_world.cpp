@@ -27,11 +27,19 @@ void JoltFree(void* ptr) {
 }
 
 void* JoltAlignedAlloc(size_t size, size_t alignment) {
+#ifdef _WIN32
+    return _aligned_malloc(size, alignment);
+#else
     return std::aligned_alloc(alignment, size);
+#endif
 }
 
 void JoltAlignedFree(void* ptr) {
+#ifdef _WIN32
+    _aligned_free(ptr);
+#else
     std::free(ptr);
+#endif
 }
 
 // ============================================================================

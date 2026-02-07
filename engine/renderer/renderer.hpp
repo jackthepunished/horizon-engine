@@ -7,6 +7,10 @@
 
 #include "engine/core/types.hpp"
 #include "engine/platform/window.hpp"
+#include "engine/rhi/rhi_command_list.hpp"
+#include "engine/rhi/rhi_device.hpp"
+#include "engine/rhi/rhi_pipeline.hpp"
+#include "engine/rhi/rhi_resources.hpp"
 
 #include <memory>
 #include <vector>
@@ -14,12 +18,7 @@
 #include <glm/glm.hpp>
 
 namespace hz {
-
-namespace gl {
-class Shader;
-class Framebuffer;
-class UniformBuffer;
-} // namespace gl
+// GL namespace removed
 
 struct DirectionalLight {
     glm::vec3 direction{0.0f, -1.0f, 0.0f};
@@ -108,9 +107,11 @@ struct SceneDataStd140 {
 class Renderer {
 public:
     /**
-     * @brief Create a renderer for the given window
+     * @brief Create a renderer
+     * @param device RHI Device
+     * @param swapchain RHI Swapchain
      */
-    explicit Renderer(Window& window);
+    Renderer(rhi::Device& device, rhi::Swapchain& swapchain);
 
     /**
      * @brief Destroy the renderer
@@ -125,125 +126,75 @@ public:
     // ========================================================================
 
     /**
-     * @brief Begin a new frame
+     * @brief Begin a new frame (acquires image)
      */
     void begin_frame();
 
     /**
-     * @brief End the current frame and swap buffers
+     * @brief End the current frame and present
      */
     void end_frame();
+
+    /**
+     * @brief Get the current command list for recording
+     */
+    [[nodiscard]] rhi::CommandList* get_command_list() const;
 
     // ========================================================================
     // Lighting
     // ========================================================================
 
-    /**
-     * @brief Submit lighting environment for the current frame
-     */
     void submit_lighting(const SceneLighting& lighting);
-
-    /**
-     * @brief Apply lighting uniforms to the given shader
-     */
-    void apply_lighting(gl::Shader& shader);
 
     // ========================================================================
     // Shadows
     // ========================================================================
 
-    /**
-     * @brief Configure shadows (must be called before shadow pass)
-     */
     void set_shadow_settings(const ShadowSettings& settings);
 
-    /**
-     * @brief Begin shadow map rendering pass
-     */
-    void begin_shadow_pass();
+    void begin_shadow_pass(rhi::CommandList& cmd);
+    void end_shadow_pass(rhi::CommandList& cmd);
 
-    /**
-     * @brief End shadow map rendering pass
-     */
-    void end_shadow_pass();
-
-    /**
-     * @brief Get the Light Space Matrix (Projection * View) used for shadows
-     */
     [[nodiscard]] glm::mat4 get_light_space_matrix() const;
-
-    /**
-     * @brief Bind the shadow map texture to a specific slot
-     */
-    void bind_shadow_map(u32 slot = 1) const;
+    [[nodiscard]] rhi::TextureView* get_shadow_map_view() const;
 
     // ========================================================================
     // Properties
     // ========================================================================
 
-    /**
-     * @brief Get the framebuffer size
-     */
     [[nodiscard]] std::pair<u32, u32> framebuffer_size() const;
 
-    /**
-     * @brief Set the clear color
-     */
     void set_clear_color(f32 r, f32 g, f32 b, f32 a = 1.0f);
-
-    /**
-     * @brief Set the clear color from vec4
-     */
     void set_clear_color(const glm::vec4& color);
 
-    /**
-     * @brief Enable/disable depth testing
-     */
-    void set_depth_test(bool enabled);
-
-    /**
-     * @brief Enable/disable face culling
-     */
-    void set_face_culling(bool enabled);
-
-    /**
-     * @brief Set viewport
-     */
-    void set_viewport(i32 x, i32 y, i32 width, i32 height);
+    void set_viewport(rhi::CommandList& cmd, i32 x, i32 y, i32 width, i32 height);
 
     // Post-Processing (HDR)
-    void resize(u32 width, u32 height);                     // Handle window resize for FBOs
-    void begin_scene_pass();                                // Renders to HDR FBO
-    void end_scene_pass();                                  // Unbinds HDR FBO
-    void render_post_process(const gl::Shader& hdr_shader); // Renders Quad to screen
+    void resize(u32 width, u32 height);
+
+    // Pass Management
+    void begin_scene_pass(rhi::CommandList& cmd);
+    void end_scene_pass(rhi::CommandList& cmd);
+
+    void render_post_process(rhi::CommandList& cmd);
 
     // Geometry Pass (SSAO Prepass)
-    void begin_geometry_pass();
-    void end_geometry_pass();
-    [[nodiscard]] u32 get_gbuffer_normal_texture() const;
-    [[nodiscard]] u32 get_gbuffer_depth_texture() const;
+    void begin_geometry_pass(rhi::CommandList& cmd);
+    void end_geometry_pass(rhi::CommandList& cmd);
+
+    [[nodiscard]] rhi::TextureView* get_gbuffer_normal_view() const;
+    [[nodiscard]] rhi::TextureView* get_gbuffer_depth_view() const;
 
     // SSAO
     void init_ssao();
-    void render_ssao(const gl::Shader& ssao_shader, const glm::mat4& projection);
-    void render_ssao_blur(const gl::Shader& blur_shader);
-    [[nodiscard]] u32 get_ssao_texture_id() const;
-    [[nodiscard]] u32 get_ssao_blur_texture_id() const;
+    void render_ssao(rhi::CommandList& cmd, const glm::mat4& projection);
+    void render_ssao_blur(rhi::CommandList& cmd);
+
+    [[nodiscard]] rhi::TextureView* get_ssao_view() const;
 
     // Bloom
-    void render_bloom(gl::Shader& extract_shader, gl::Shader& blur_shader, float threshold,
-                      int blur_passes);
-    [[nodiscard]] u32 get_bloom_texture_id() const;
-
-    void render_texture(const gl::Shader& shader, u32 texture_id);
-
-    [[nodiscard]] u32 get_scene_texture_id() const;
-    [[nodiscard]] u32 get_shadow_map_texture_id() const;
-    [[nodiscard]] u32 get_scene_depth_texture_id() const;
-
-    // Volumetric Fog / God Rays
-    void render_volumetric(gl::Shader& volumetric_shader);
-    [[nodiscard]] u32 get_volumetric_texture_id() const;
+    void render_bloom(rhi::CommandList& cmd, float threshold, int blur_passes);
+    [[nodiscard]] rhi::TextureView* get_bloom_view() const;
 
     // UBOs
     void update_camera(const glm::mat4& view, const glm::mat4& projection,
@@ -253,38 +204,53 @@ public:
 private:
     void init_quad();
     void init_ubos();
+    void create_resources();
 
-    Window* m_window;
+    rhi::Device& m_device;
+    rhi::Swapchain& m_swapchain;
+
+    // Command Buffer for the current frame
+    rhi::CommandList* m_current_cmd{nullptr};
+
     glm::vec4 m_clear_color{0.1f, 0.1f, 0.15f, 1.0f};
     SceneLighting m_scene_lighting;
 
-    std::unique_ptr<gl::UniformBuffer> m_camera_ubo;
-    std::unique_ptr<gl::UniformBuffer> m_scene_ubo;
+    // UBOs (mapped buffers)
+    std::unique_ptr<rhi::Buffer> m_camera_ubo;
+    std::unique_ptr<rhi::Buffer> m_scene_ubo;
 
     // Shadows
-    std::unique_ptr<gl::Framebuffer> m_shadow_fbo;
+    std::unique_ptr<rhi::Framebuffer> m_shadow_fbo;
+    std::unique_ptr<rhi::Texture> m_shadow_map;
+    std::unique_ptr<rhi::TextureView> m_shadow_map_view;
     ShadowSettings m_shadow_settings;
 
     // HDR
-    std::unique_ptr<gl::Framebuffer> m_hdr_fbo;
-    u32 m_quad_vao{0};
-    u32 m_quad_vbo{0};
+    std::unique_ptr<rhi::Framebuffer> m_hdr_fbo;
+    std::unique_ptr<rhi::Texture> m_hdr_color_texture;
+    std::unique_ptr<rhi::TextureView> m_hdr_color_view;
+    std::unique_ptr<rhi::Texture> m_hdr_depth_texture;
+    std::unique_ptr<rhi::TextureView> m_hdr_depth_view;
+
+    // Quad Resources (Vertex Buffer)
+    std::unique_ptr<rhi::Buffer> m_quad_vb;
 
     // Bloom
-    std::unique_ptr<gl::Framebuffer> m_bloom_fbo;     // Brightness extraction
-    std::unique_ptr<gl::Framebuffer> m_blur_fbo_ping; // Ping-pong blur
-    std::unique_ptr<gl::Framebuffer> m_blur_fbo_pong;
+    std::unique_ptr<rhi::Framebuffer> m_bloom_fbo;
+    std::unique_ptr<rhi::Framebuffer> m_blur_fbo_ping;
+    std::unique_ptr<rhi::Framebuffer> m_blur_fbo_pong;
 
     // SSAO / G-Buffer
-    std::unique_ptr<gl::Framebuffer> m_gbuffer_fbo;
-    std::unique_ptr<gl::Framebuffer> m_ssao_fbo;
-    std::unique_ptr<gl::Framebuffer> m_ssao_blur_fbo; // Reuse blur FBO? No, need single channel.
+    std::unique_ptr<rhi::Framebuffer> m_gbuffer_fbo;
+    std::unique_ptr<rhi::Framebuffer> m_ssao_fbo;
+    std::unique_ptr<rhi::Framebuffer> m_ssao_blur_fbo;
 
     std::vector<glm::vec3> m_ssao_kernel;
-    u32 m_ssao_noise_texture{0};
+    std::unique_ptr<rhi::Texture> m_ssao_noise_texture;
+    std::unique_ptr<rhi::TextureView> m_ssao_noise_view;
 
     // Volumetric Fog
-    std::unique_ptr<gl::Framebuffer> m_volumetric_fbo;
+    std::unique_ptr<rhi::Framebuffer> m_volumetric_fbo;
 };
 
 } // namespace hz

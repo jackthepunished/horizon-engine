@@ -15,9 +15,11 @@
 #include "rhi_resources.hpp"
 #include "rhi_types.hpp"
 
+#include <filesystem>
 #include <functional>
 #include <memory>
 #include <span>
+#include <string_view>
 
 namespace hz::rhi {
 
@@ -241,6 +243,35 @@ public:
                          const char* entry_point = "main", const char* debug_name = nullptr) {
         return create_shader_module({bytecode, stage, entry_point, debug_name});
     }
+
+    /**
+     * @brief Create a shader module from GLSL source code
+     *
+     * Compiles GLSL to SPIR-V at runtime using shaderc.
+     *
+     * @param source GLSL source code
+     * @param stage Shader stage
+     * @param debug_name Optional debug name
+     * @return Shader module, or nullptr on compilation failure
+     */
+    [[nodiscard]] std::unique_ptr<ShaderModule>
+    create_shader_from_glsl(std::string_view source, ShaderStage stage,
+                            const char* debug_name = nullptr);
+
+    /**
+     * @brief Create a shader module from a GLSL file
+     *
+     * Loads and compiles a GLSL file to SPIR-V at runtime.
+     *
+     * @param path Path to the GLSL shader file
+     * @param stage Shader stage (if None, inferred from extension)
+     * @param debug_name Optional debug name
+     * @return Shader module, or nullptr on failure
+     */
+    [[nodiscard]] std::unique_ptr<ShaderModule>
+    create_shader_from_file(const std::filesystem::path& path,
+                            ShaderStage stage = ShaderStage::None,
+                            const char* debug_name = nullptr);
 
     // ========================================================================
     // Resource Creation - Render Pass & Framebuffer

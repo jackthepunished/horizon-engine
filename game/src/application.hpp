@@ -12,6 +12,7 @@
 #include "systems/physics_system.hpp"
 #include "systems/player_system.hpp"
 
+#include <array>
 #include <memory>
 #include <optional>
 
@@ -26,7 +27,9 @@
 #include <engine/renderer/deferred_renderer.hpp>
 #include <engine/renderer/ibl.hpp>
 #include <engine/renderer/mesh.hpp>
-#include <engine/renderer/opengl/shader.hpp>
+#include <engine/rhi/rhi_command_list.hpp>
+#include <engine/rhi/rhi_device.hpp>
+#include <engine/rhi/rhi_resources.hpp>
 #include <engine/scene/scene.hpp>
 #include <engine/ui/imgui_layer.hpp>
 
@@ -65,6 +68,11 @@ public:
 private:
     // Core systems
     std::unique_ptr<hz::Window> m_window;
+
+    // RHI Core
+    std::unique_ptr<hz::rhi::Device> m_device;
+    std::unique_ptr<hz::rhi::Swapchain> m_swapchain;
+
     std::unique_ptr<hz::InputManager> m_input;
     std::unique_ptr<hz::ImGuiLayer> m_imgui;
     std::unique_ptr<hz::DeferredRenderer> m_renderer;
@@ -81,10 +89,6 @@ private:
     CharacterSystem m_character_system;
     LifetimeSystem m_lifetime_system;
 
-    // Shaders
-    std::unique_ptr<hz::gl::Shader> m_geometry_shader;
-    std::unique_ptr<hz::gl::Shader> m_shadow_shader;
-
     // Models & Meshes (optional because they are created during init)
     std::optional<hz::Mesh> m_sphere_mesh;
     std::optional<hz::Mesh> m_cube_mesh;
@@ -97,16 +101,24 @@ private:
     std::optional<hz::Texture> m_arm_tex;
 
     // IBL textures
-    GLuint m_irradiance_map{0};
-    GLuint m_prefilter_map{0};
-    GLuint m_brdf_lut{0};
-    GLuint m_environment_map{0};
+    hz::rhi::TextureView* m_irradiance_map{nullptr};
+    hz::rhi::TextureView* m_prefilter_map{nullptr};
+    hz::rhi::TextureView* m_brdf_lut{nullptr};
+    hz::rhi::TextureView* m_environment_map{nullptr};
 
     // UI state
     bool m_show_grid{false};
     bool m_show_model{true};
     bool m_show_skeleton{false};
     glm::vec3 m_ik_target_position{6.0f, 1.0f, 0.5f};
+
+    // Virtual frame synchronization
+    static constexpr unsigned int APP_MAX_FRAMES_IN_FLIGHT = 2;
+    unsigned int m_current_frame = 0;
+
+    std::array<std::unique_ptr<hz::rhi::Semaphore>, 2> m_image_available_sems;
+    std::array<std::unique_ptr<hz::rhi::Semaphore>, 2> m_render_finished_sems;
+    std::array<std::unique_ptr<hz::rhi::Fence>, 2> m_frame_fences;
 
     // Previous frame data for TAA
     glm::mat4 m_prev_view_projection{1.0f};

@@ -64,7 +64,8 @@ VulkanTexture::VulkanTexture(VulkanDevice& device, const TextureDesc& desc)
 
     // Set debug name
     if (desc.debug_name) {
-        m_device.set_debug_name(reinterpret_cast<u64>(m_image), desc.debug_name);
+        m_device.set_vk_debug_name(reinterpret_cast<u64>(m_image), VK_OBJECT_TYPE_IMAGE,
+                                   desc.debug_name);
     }
 
     HZ_LOG_DEBUG("Created Vulkan texture: {}x{}x{}, format={}, mips={}, layers={}", m_width,
@@ -88,7 +89,8 @@ VulkanTexture::VulkanTexture(VulkanDevice& device, VkImage image, const TextureD
 
     // Set debug name
     if (desc.debug_name) {
-        m_device.set_debug_name(reinterpret_cast<u64>(m_image), desc.debug_name);
+        m_device.set_vk_debug_name(reinterpret_cast<u64>(m_image), VK_OBJECT_TYPE_IMAGE,
+                                   desc.debug_name);
     }
 }
 
@@ -149,7 +151,8 @@ VulkanTextureView::VulkanTextureView(VulkanDevice& device, const TextureViewDesc
 
     // Set debug name
     if (desc.debug_name) {
-        m_device.set_debug_name(reinterpret_cast<u64>(m_image_view), desc.debug_name);
+        m_device.set_vk_debug_name(reinterpret_cast<u64>(m_image_view), VK_OBJECT_TYPE_IMAGE_VIEW,
+                                   desc.debug_name);
     }
 }
 

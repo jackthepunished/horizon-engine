@@ -7,7 +7,6 @@
 
 #include "engine/animation/skeleton.hpp"
 #include "engine/core/types.hpp"
-#include "engine/renderer/opengl/shader.hpp"
 
 #include <memory>
 #include <vector>
@@ -115,12 +114,6 @@ public:
     [[nodiscard]] bool has_pending() const { return !m_line_vertices.empty(); }
 
 private:
-    std::unique_ptr<gl::Shader> m_line_shader;
-
-    // GPU resources
-    u32 m_line_vao{0};
-    u32 m_line_vbo{0};
-
     // Batched vertices
     std::vector<DebugVertex> m_line_vertices;
 

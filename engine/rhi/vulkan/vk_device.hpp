@@ -148,6 +148,7 @@ public:
                         u32 array_layer, Offset3D offset) override;
     void generate_mipmaps(Texture& texture) override;
     void set_debug_name(u64 handle, const char* name) override;
+    void set_vk_debug_name(u64 handle, VkObjectType type, const char* name);
 
     // Native handles
     [[nodiscard]] u64 native_handle() const noexcept override {

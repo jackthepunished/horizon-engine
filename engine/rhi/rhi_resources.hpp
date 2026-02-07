@@ -9,6 +9,8 @@
 
 #include "rhi_types.hpp"
 
+#include <algorithm>
+#include <cstring>
 #include <span>
 #include <string>
 

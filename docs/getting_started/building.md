@@ -51,8 +51,7 @@ We recommend using **Ninja** for the fastest build times.
    ```
 
 ---
-
-## Build Options
+VK_STRUCTURE_T# Build Options
 
 | Option | Default | Description |
 |--------|---------|-------------|

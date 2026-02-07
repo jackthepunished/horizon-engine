@@ -30,6 +30,7 @@ set(ENGINE_SOURCES
     assets/model.cpp
     assets/asset_registry.cpp
     assets/cubemap.cpp
+    assets/shader_compiler.cpp
 
     # Physics
     physics/physics_world.cpp
@@ -71,10 +72,12 @@ set(ENGINE_SOURCES
     # GLAD (OpenGL loader)
     vendor/glad/glad.c
     vendor/ufbx/ufbx.c
+    vendor/stb_impl.cpp
 )
 
 # RHI Vulkan Backend Sources (conditionally added)
 set(ENGINE_VULKAN_SOURCES
+    rhi/rhi_device.cpp
     rhi/vulkan/vk_device.cpp
     rhi/vulkan/vk_buffer.cpp
     rhi/vulkan/vk_texture.cpp
@@ -194,8 +197,9 @@ if(HZ_HAS_VULKAN)
     target_link_libraries(horizon_engine
         PUBLIC
             volk
-        PRIVATE
             vma
+        PRIVATE
+            shaderc
     )
 endif()
 

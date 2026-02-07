@@ -110,6 +110,35 @@ struct RenderPassBeginInfo {
 };
 
 // ============================================================================
+// Dynamic Rendering Structs (Vulkan 1.3 / VK_KHR_dynamic_rendering)
+// ============================================================================
+
+// Note: LoadOp and StoreOp are defined in rhi_types.hpp
+
+/**
+ * @brief A single color or depth/stencil attachment for dynamic rendering
+ */
+struct RenderingAttachment {
+    TextureView* view{nullptr};
+    TextureView* resolve_view{nullptr}; ///< For MSAA resolve, nullptr if no resolve
+    LoadOp load_op{LoadOp::Clear};
+    StoreOp store_op{StoreOp::Store};
+    ClearValue clear_value{}; ///< ClearColor or ClearDepthStencil
+};
+
+/**
+ * @brief Information for beginning dynamic rendering (framebuffer-less)
+ */
+struct RenderingInfo {
+    Scissor render_area{}; ///< x, y, width, height
+    u32 layer_count{1};    ///< Number of layers to render
+    u32 view_mask{0};      ///< For multiview rendering
+    std::span<const RenderingAttachment> color_attachments{};
+    const RenderingAttachment* depth_attachment{nullptr};
+    const RenderingAttachment* stencil_attachment{nullptr};
+};
+
+// ============================================================================
 // Draw/Dispatch Arguments
 // ============================================================================
 
@@ -261,6 +290,25 @@ public:
      * @brief Advance to the next subpass (if using multi-subpass render pass)
      */
     virtual void next_subpass() = 0;
+
+    // ========================================================================
+    // Dynamic Rendering Commands (Vulkan 1.3)
+    // ========================================================================
+
+    /**
+     * @brief Begin dynamic rendering (no framebuffer required)
+     * @param info Rendering configuration with attachments
+     *
+     * This uses VK_KHR_dynamic_rendering / Vulkan 1.3 core feature.
+     * Allows rendering directly to arbitrary image views without
+     * pre-created render passes or framebuffers.
+     */
+    virtual void begin_rendering(const RenderingInfo& info) = 0;
+
+    /**
+     * @brief End dynamic rendering
+     */
+    virtual void end_rendering() = 0;
 
     // ========================================================================
     // Pipeline Binding

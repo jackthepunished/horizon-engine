@@ -21,13 +21,17 @@ Window::Window(const WindowConfig& config) {
         HZ_ENGINE_TRACE("GLFW initialized");
     }
 
-    // Configure OpenGL context
+    // Configure Context
+#if defined(HZ_VULKAN_BACKEND)
+    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
+#else
     glfwWindowHint(GLFW_CONTEXT_VERSION_MAJOR, 4);
     glfwWindowHint(GLFW_CONTEXT_VERSION_MINOR, 1);
     glfwWindowHint(GLFW_OPENGL_PROFILE, GLFW_OPENGL_CORE_PROFILE);
     glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GLFW_TRUE);
 #ifdef HZ_DEBUG
     glfwWindowHint(GLFW_OPENGL_DEBUG_CONTEXT, GLFW_TRUE);
+#endif
 #endif
 
     glfwWindowHint(GLFW_RESIZABLE, config.resizable ? GLFW_TRUE : GLFW_FALSE);
@@ -43,11 +47,15 @@ Window::Window(const WindowConfig& config) {
         throw std::runtime_error("Failed to create GLFW window");
     }
 
+#if !defined(HZ_VULKAN_BACKEND)
     // Make OpenGL context current
     glfwMakeContextCurrent(m_window);
+#endif
 
+#if !defined(HZ_VULKAN_BACKEND)
     // VSync
     glfwSwapInterval(config.vsync ? 1 : 0);
+#endif
 
     // Store this pointer for callbacks
     glfwSetWindowUserPointer(m_window, this);
