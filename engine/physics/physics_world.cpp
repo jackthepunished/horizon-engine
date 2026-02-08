@@ -255,6 +255,29 @@ PhysicsBodyID PhysicsWorld::create_dynamic_box(const glm::vec3& position,
     return {body_id};
 }
 
+PhysicsBodyID PhysicsWorld::create_static_sphere(const glm::vec3& position, f32 radius) {
+    if (!m_initialized)
+        return PhysicsBodyID::invalid();
+
+    auto& body_interface = m_physics_system->GetBodyInterface();
+
+    JPH::SphereShapeSettings sphere_settings(radius);
+    JPH::ShapeSettings::ShapeResult shape_result = sphere_settings.Create();
+
+    if (shape_result.HasError()) {
+        HZ_ENGINE_ERROR("Failed to create sphere shape: {}", shape_result.GetError().c_str());
+        return PhysicsBodyID::invalid();
+    }
+
+    JPH::BodyCreationSettings body_settings(
+        shape_result.Get(), JPH::RVec3(position.x, position.y, position.z), JPH::Quat::sIdentity(),
+        JPH::EMotionType::Static, PhysicsLayers::NON_MOVING);
+
+    JPH::BodyID body_id =
+        body_interface.CreateAndAddBody(body_settings, JPH::EActivation::DontActivate);
+    return {body_id};
+}
+
 PhysicsBodyID PhysicsWorld::create_dynamic_sphere(const glm::vec3& position, f32 radius, f32 mass) {
     if (!m_initialized)
         return PhysicsBodyID::invalid();

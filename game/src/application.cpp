@@ -230,13 +230,20 @@ void Application::setup_scene_entities() {
         mc.metallic = 0.1f;
         mc.roughness = 0.8f;
         mc.albedo_color = glm::vec3(0.8f);
+
+        // Physics
+        auto& rb = m_scene->registry().emplace<hz::RigidBodyComponent>(plane);
+        rb.type = hz::RigidBodyComponent::BodyType::Static;
+
+        auto& bc = m_scene->registry().emplace<hz::BoxColliderComponent>(plane);
+        bc.half_extents = glm::vec3(25.0f, 0.1f, 25.0f);
     }
 
     // Test Cube
     if (m_cube_handle.is_valid()) {
         auto cube = m_scene->create_entity();
         auto& tc = m_scene->registry().emplace<hz::TransformComponent>(cube);
-        tc.position = glm::vec3(-2.0f, 1.0f, 0.0f);
+        tc.position = glm::vec3(-2.0f, 10.0f, 0.0f); // Higher up to fall
 
         auto& mc = m_scene->registry().emplace<hz::MeshComponent>(cube);
         mc.mesh_type = hz::MeshComponent::MeshType::Model;
@@ -244,13 +251,21 @@ void Application::setup_scene_entities() {
         mc.albedo_color = glm::vec3(1.0f, 0.2f, 0.2f); // Reddish
         mc.metallic = 0.9f;
         mc.roughness = 0.1f;
+
+        // Physics
+        auto& rb = m_scene->registry().emplace<hz::RigidBodyComponent>(cube);
+        rb.type = hz::RigidBodyComponent::BodyType::Dynamic;
+        rb.mass = 10.0f;
+
+        auto& bc = m_scene->registry().emplace<hz::BoxColliderComponent>(cube);
+        bc.half_extents = glm::vec3(0.5f);
     }
 
     // Test Sphere
     if (m_sphere_handle.is_valid()) {
         auto sphere = m_scene->create_entity();
         auto& tc = m_scene->registry().emplace<hz::TransformComponent>(sphere);
-        tc.position = glm::vec3(2.0f, 1.0f, 0.0f);
+        tc.position = glm::vec3(2.0f, 10.0f, 0.0f); // Higher up
 
         auto& mc = m_scene->registry().emplace<hz::MeshComponent>(sphere);
         mc.mesh_type = hz::MeshComponent::MeshType::Model;
@@ -258,6 +273,14 @@ void Application::setup_scene_entities() {
         mc.albedo_color = glm::vec3(0.2f, 1.0f, 0.2f); // Greenish
         mc.metallic = 0.0f;
         mc.roughness = 0.2f;
+
+        // Physics
+        auto& rb = m_scene->registry().emplace<hz::RigidBodyComponent>(sphere);
+        rb.type = hz::RigidBodyComponent::BodyType::Dynamic;
+        rb.mass = 5.0f;
+
+        auto& sc = m_scene->registry().emplace<hz::SphereColliderComponent>(sphere);
+        sc.radius = 1.0f;
     }
 
     // Point Light

@@ -88,6 +88,7 @@ public:
                                                   const glm::vec3& half_extents);
     [[nodiscard]] PhysicsBodyID create_dynamic_box(const glm::vec3& position,
                                                    const glm::vec3& half_extents, f32 mass = 1.0f);
+    [[nodiscard]] PhysicsBodyID create_static_sphere(const glm::vec3& position, f32 radius);
     [[nodiscard]] PhysicsBodyID create_dynamic_sphere(const glm::vec3& position, f32 radius,
                                                       f32 mass = 1.0f);
     [[nodiscard]] PhysicsBodyID create_dynamic_capsule(const glm::vec3& position, f32 half_height,

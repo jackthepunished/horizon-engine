@@ -47,6 +47,31 @@ void PhysicsSystem::create_physics_bodies(hz::Scene& scene, hz::PhysicsWorld& ph
         }
     }
 
+    // Create sphere collider bodies
+    {
+        auto view = scene.registry()
+                        .view<hz::TransformComponent, hz::RigidBodyComponent,
+                              hz::SphereColliderComponent>();
+
+        for (auto [entity, tc, rb, sc] : view.each()) {
+            if (rb.created) {
+                continue;
+            }
+
+            hz::PhysicsBodyID body_id;
+            if (rb.type == hz::RigidBodyComponent::BodyType::Static) {
+                body_id = physics.create_static_sphere(tc.position, sc.radius);
+            } else {
+                body_id = physics.create_dynamic_sphere(tc.position, sc.radius, rb.mass);
+            }
+
+            if (body_id.is_valid()) {
+                rb.set_body_id(new hz::PhysicsBodyID(body_id));
+                rb.created = true;
+            }
+        }
+    }
+
     // Create capsule collider bodies (for player, etc.)
     {
         auto view = scene.registry()

@@ -264,6 +264,21 @@ struct BoxColliderComponent {
     }
 };
 
+struct SphereColliderComponent {
+    float radius{0.5f};
+    glm::vec3 offset{0.0f};
+
+    friend void to_json(nlohmann::json& j, const SphereColliderComponent& c) {
+        j = nlohmann::json{{"radius", c.radius},
+                           {"offset", TransformComponent::vec3_to_json(c.offset)}};
+    }
+    friend void from_json(const nlohmann::json& j, SphereColliderComponent& c) {
+        c.radius = j.value("radius", 0.5f);
+        if (j.contains("offset"))
+            c.offset = TransformComponent::vec3_from_json(j["offset"]);
+    }
+};
+
 struct CapsuleColliderComponent {
     float radius{0.5f};
     float half_height{0.5f}; // Cylinder half-height. Total height = 2*half_height + 2*radius
