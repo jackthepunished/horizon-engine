@@ -344,6 +344,7 @@ private:
     void create_pipelines();
     void create_fullscreen_quad();
     void render_fullscreen_quad(rhi::CommandList& cmd) const;
+    void update_gbuffer_descriptor_set();
 
     rhi::Device& m_device;
     rhi::Swapchain& m_swapchain;

@@ -2,6 +2,7 @@
 
 #include "engine/assets/asset_registry.hpp"
 #include "engine/core/log.hpp"
+#include "engine/renderer/deferred_render_data.hpp"
 
 #include <cmath>
 #include <fstream>
@@ -261,6 +262,7 @@ bool DeferredRenderer::init() {
     create_pipelines(); // Need to implement this
 
     m_gbuffer.create(m_device, m_width, m_height);
+    update_gbuffer_descriptor_set();
 
     // Create HDR Lighting Texture
     {
@@ -283,12 +285,12 @@ bool DeferredRenderer::init() {
     TAAConfig taa_cfg;
     m_taa.create(m_device, m_width, m_height, taa_cfg);
 
-    // Create point light SSBO (max 1024 lights)
+    // Create point light SSBO
     m_point_light_ssbo =
-        m_device.create_buffer(sizeof(GPUPointLight) * 1024,
-                               rhi::BufferUsage::StorageBuffer | rhi::BufferUsage::TransferDst,
-                               nullptr, // No initial data
-                               rhi::MemoryUsage::CPU_To_GPU, "PointLightSSBO");
+        m_device.create_buffer({.size = sizeof(GPUPointLight) * kMaxDeferredPointLights,
+                                .usage = rhi::BufferUsage::StorageBuffer,
+                                .memory = rhi::MemoryUsage::CPU_To_GPU,
+                                .debug_name = "PointLightSSBO"});
 
     m_initialized = true;
     HZ_LOG_INFO("Deferred Renderer Initialized (Vulkan Backed)");
@@ -314,6 +316,7 @@ void DeferredRenderer::resize(u32 width, u32 height) {
 
     m_gbuffer.destroy();
     m_gbuffer.create(m_device, m_width, m_height);
+    update_gbuffer_descriptor_set();
 
     m_lighting_texture.reset();
     m_lighting_view.reset();
@@ -341,21 +344,10 @@ void DeferredRenderer::begin_geometry_pass(rhi::CommandList& cmd, const Camera& 
     if (!m_initialized)
         return;
 
-    // 1. Update Camera UBO
-    struct CameraData {
-        glm::mat4 view;
-        glm::mat4 projection;
-        glm::mat4 view_projection;
-        glm::vec4 camera_position;
-    } camera_data;
-
-    camera_data.view = camera.view_matrix();
-    camera_data.projection =
-        camera.projection_matrix(static_cast<f32>(m_width) / static_cast<f32>(m_height));
-    camera_data.view_projection = camera_data.projection * camera_data.view;
-    camera_data.camera_position = glm::vec4(camera.position(), 1.0f);
-
-    m_device.update_buffer(*m_camera_ubo, &camera_data, sizeof(CameraData));
+    const float aspect = static_cast<float>(m_width) / static_cast<float>(m_height);
+    const auto camera_ubo = make_deferred_camera_ubo(
+        camera.view_matrix(), camera.projection_matrix(aspect), camera.position());
+    m_camera_ubo->upload(camera_ubo);
 
     // 2. Transition GBuffer to RenderTarget
     std::vector<rhi::TextureBarrier> barriers;
@@ -433,9 +425,7 @@ void DeferredRenderer::begin_geometry_pass(rhi::CommandList& cmd, const Camera& 
     cmd.bind_pipeline(*m_geometry_pipeline);
     cmd.set_viewport_and_scissor({m_width, m_height});
 
-    // 5. Update & Bind Camera Descriptor Set
-    // We update the descriptor set here because it changes per frame (camera data)
-    m_camera_set->write_buffer(0, *m_camera_ubo);
+    // 5. Bind Camera Descriptor Set
     cmd.bind_descriptor_set(*m_geometry_layout, 0, *m_camera_set);
 
     m_csm.update_cascades(
@@ -485,24 +475,17 @@ void DeferredRenderer::execute_lighting_pass(
     if (!m_initialized)
         return;
 
-    // 1. Update Light UBO & SSBO
-    struct LightData {
-        glm::vec4 sun_direction;
-        glm::vec4 sun_color;
-        glm::uvec4 light_counts;
-    } light_data;
+    const u32 point_light_count = static_cast<u32>(
+        std::min(point_lights.size(), static_cast<size_t>(kMaxDeferredPointLights)));
+    const u32 spot_light_count =
+        static_cast<u32>(std::min(spot_lights.size(), static_cast<size_t>(kMaxDeferredSpotLights)));
+    const auto light_ubo = make_deferred_light_ubo(sun_direction, sun_color, 1.0f,
+                                                   point_light_count, spot_light_count);
+    m_light_ubo->upload(light_ubo);
 
-    light_data.sun_direction = glm::vec4(sun_direction, 0.0f);
-    light_data.sun_color = glm::vec4(sun_color, 1.0f);
-    light_data.light_counts = glm::uvec4(point_lights.size(), spot_lights.size(), 0, 0);
-
-    m_device.update_buffer(*m_light_ubo, &light_data, sizeof(LightData));
-
-    // Update point lights
-    u32 count = std::min((u32)point_lights.size(), 1024u);
-    if (count > 0) {
-        m_device.update_buffer(*m_point_light_ssbo, point_lights.data(),
-                               count * sizeof(GPUPointLight));
+    if (point_light_count > 0 && m_point_light_ssbo) {
+        m_point_light_ssbo->upload(
+            std::span<const GPUPointLight>(point_lights.data(), point_light_count));
     }
 
     // 2. Transition Lighting Texture to RenderTarget
@@ -533,31 +516,9 @@ void DeferredRenderer::execute_lighting_pass(
     cmd.bind_pipeline(*m_lighting_pipeline);
     cmd.set_viewport_and_scissor({m_width, m_height});
 
-    // 5. Update & Bind Descriptor Sets
+    // 5. Bind Descriptor Sets
     cmd.bind_descriptor_set(*m_lighting_layout, 0, *m_camera_set);
-
-    // Set 1: GBuffer Textures
-    {
-        std::vector<rhi::DescriptorWrite> writes;
-        writes.push_back(rhi::DescriptorWrite::combined_image_sampler(0, *m_gbuffer.color_views[0],
-                                                                      *m_nearest_sampler));
-        writes.push_back(rhi::DescriptorWrite::combined_image_sampler(1, *m_gbuffer.color_views[1],
-                                                                      *m_nearest_sampler));
-        writes.push_back(rhi::DescriptorWrite::combined_image_sampler(2, *m_gbuffer.color_views[2],
-                                                                      *m_nearest_sampler));
-        writes.push_back(rhi::DescriptorWrite::combined_image_sampler(3, *m_gbuffer.depth_view,
-                                                                      *m_nearest_sampler));
-        m_gbuffer_input_set->write(writes);
-    }
     cmd.bind_descriptor_set(*m_lighting_layout, 1, *m_gbuffer_input_set);
-
-    // Set 2: Lights
-    {
-        std::vector<rhi::DescriptorWrite> writes;
-        writes.push_back(rhi::DescriptorWrite::uniform_buffer(0, *m_light_ubo));
-        writes.push_back(rhi::DescriptorWrite::storage_buffer(1, *m_point_light_ssbo));
-        m_lighting_data_set->write(writes);
-    }
     cmd.bind_descriptor_set(*m_lighting_layout, 2, *m_lighting_data_set);
 
     // 6. Draw
@@ -627,12 +588,7 @@ void DeferredRenderer::render_to_screen(rhi::CommandList& cmd) {
     cmd.bind_pipeline(*m_composite_pipeline);
 
     // Update & Bind Descriptor Set
-    {
-        std::vector<rhi::DescriptorWrite> writes;
-        writes.push_back(
-            rhi::DescriptorWrite::combined_image_sampler(0, *m_lighting_view, *m_nearest_sampler));
-        m_composite_input_set->write(writes);
-    }
+    m_composite_input_set->write_texture(0, *m_lighting_view, *m_nearest_sampler);
     cmd.bind_descriptor_set(*m_composite_layout, 0, *m_composite_input_set);
 
     // Push Constants (Exposure)
@@ -648,6 +604,10 @@ void DeferredRenderer::render_to_screen(rhi::CommandList& cmd) {
     barrier.new_state = rhi::ResourceState::Present;
     cmd.barrier(barrier);
 }
+
+// ============================================================================
+// Private helpers
+// ============================================================================
 
 // =========================================================================
 // Configuration
@@ -725,24 +685,6 @@ void DeferredRenderer::create_pipelines() {
         rhi::DescriptorSetLayoutDesc desc;
         desc.bindings.push_back(
             rhi::DescriptorBinding::combined_image_sampler(0, rhi::ShaderStage::Fragment));
-        m_composite_input_layout = m_device.create_descriptor_set_layout(desc);
-    }
-
-    // Lighting data layout (set 2: LightUBO + PointLightSSBO)
-    {
-        rhi::DescriptorSetLayoutDesc desc;
-        desc.bindings.push_back(
-            rhi::DescriptorBinding::uniform_buffer(0, rhi::ShaderStage::Fragment));
-        desc.bindings.push_back(
-            rhi::DescriptorBinding::storage_buffer(1, rhi::ShaderStage::Fragment));
-        m_lighting_data_layout = m_device.create_descriptor_set_layout(desc);
-    }
-
-    // Composite input layout (set 0: HDR result texture)
-    {
-        rhi::DescriptorSetLayoutDesc desc;
-        desc.bindings.push_back(
-            rhi::DescriptorBinding::sampled_image(0, rhi::ShaderStage::Fragment));
         m_composite_input_layout = m_device.create_descriptor_set_layout(desc);
     }
 
@@ -865,7 +807,7 @@ void DeferredRenderer::create_pipelines() {
         desc.max_sets = 8;
         desc.pool_sizes.push_back({rhi::DescriptorType::UniformBuffer, 4});
         desc.pool_sizes.push_back({rhi::DescriptorType::StorageBuffer, 2});
-        desc.pool_sizes.push_back({rhi::DescriptorType::CombinedImageSampler, 4});
+        desc.pool_sizes.push_back({rhi::DescriptorType::CombinedImageSampler, 12});
         desc.pool_sizes.push_back({rhi::DescriptorType::SampledImage, 8});
         m_descriptor_pool = m_device.create_descriptor_pool(desc);
     }
@@ -877,10 +819,14 @@ void DeferredRenderer::create_pipelines() {
     m_composite_input_set = m_descriptor_pool->allocate(*m_composite_input_layout);
 
     // Create UBO buffers
-    m_camera_ubo =
-        m_device.create_uniform_buffer(sizeof(glm::mat4) * 4 + sizeof(glm::vec4), "CameraUBO");
-    m_light_ubo =
-        m_device.create_uniform_buffer(sizeof(glm::vec4) * 2 + sizeof(glm::uvec4), "LightUBO");
+    m_camera_ubo = m_device.create_uniform_buffer(sizeof(DeferredCameraUBO), "CameraUBO");
+    m_light_ubo = m_device.create_uniform_buffer(sizeof(DeferredLightUBO), "LightUBO");
+
+    m_camera_set->write_buffer(0, *m_camera_ubo);
+    m_lighting_data_set->write_buffer(0, *m_light_ubo);
+    if (m_point_light_ssbo) {
+        m_lighting_data_set->write_storage_buffer(1, *m_point_light_ssbo);
+    }
 
     // Create samplers
     {
@@ -909,6 +855,20 @@ void DeferredRenderer::create_pipelines() {
     }
 
     HZ_LOG_INFO("Deferred renderer pipelines created");
+}
+
+void DeferredRenderer::update_gbuffer_descriptor_set() {
+    if (!m_gbuffer_input_set || !m_nearest_sampler) {
+        return;
+    }
+
+    m_gbuffer_input_set->write_texture(0, *m_gbuffer.color_views[GBUFFER_ALBEDO_METALLIC],
+                                       *m_nearest_sampler);
+    m_gbuffer_input_set->write_texture(1, *m_gbuffer.color_views[GBUFFER_NORMAL_ROUGHNESS],
+                                       *m_nearest_sampler);
+    m_gbuffer_input_set->write_texture(2, *m_gbuffer.color_views[GBUFFER_EMISSION_ID],
+                                       *m_nearest_sampler);
+    m_gbuffer_input_set->write_texture(3, *m_gbuffer.depth_view, *m_nearest_sampler);
 }
 
 void DeferredRenderer::create_fullscreen_quad() {
