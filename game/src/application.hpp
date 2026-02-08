@@ -90,6 +90,7 @@ private:
     LifetimeSystem m_lifetime_system;
 
     // Models & Meshes (optional because they are created during init)
+    std::optional<hz::Mesh> m_plane_mesh;
     std::optional<hz::Mesh> m_sphere_mesh;
     std::optional<hz::Mesh> m_cube_mesh;
     std::optional<hz::Model> m_test_model;      // Treasure chest

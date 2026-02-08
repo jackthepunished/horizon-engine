@@ -10,6 +10,8 @@
 
 namespace hz {
 
+class Mesh;
+
 // ==========================================
 // Tag Component (Properties)
 // ==========================================
@@ -68,6 +70,9 @@ struct MeshComponent {
 
     // For loaded models (when mesh_type == Model)
     ModelHandle model{};
+
+    // Runtime render pointer (not serialized)
+    const Mesh* mesh_render_ptr{nullptr};
 
     // ==========================================================================
     // Material (new handle-based system - preferred)

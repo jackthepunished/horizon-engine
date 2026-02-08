@@ -128,6 +128,42 @@ void Application::init_scene() {
 }
 
 void Application::load_assets() {
+    // 1. Create Meshes
+    m_plane_mesh = hz::Mesh::create_plane(50.0f, 10.0f); // 50x50 plane
+    m_plane_mesh->upload_to_gpu(*m_device, "PlaneMesh");
+
+    m_sphere_mesh = hz::Mesh::create_sphere(1.0f, 64, 64);
+    m_sphere_mesh->upload_to_gpu(*m_device, "SphereMesh");
+
+    m_cube_mesh = hz::Mesh::create_cube(1.0f);
+    m_cube_mesh->upload_to_gpu(*m_device, "CubeMesh");
+
+    // 2. Load/Create Default Textures
+
+    // Albedo (White)
+    {
+        hz::u8 data[4] = {200, 200, 200, 255};
+        m_albedo_tex.emplace();
+        m_albedo_tex->create(1, 1, hz::TextureFormat::RGBA8, data);
+        m_albedo_tex->upload_to_gpu(*m_device);
+    }
+
+    // Normal (Flat Z+)
+    {
+        hz::u8 data[4] = {128, 128, 255, 255};
+        m_normal_tex.emplace();
+        m_normal_tex->create(1, 1, hz::TextureFormat::RGBA8, data);
+        m_normal_tex->upload_to_gpu(*m_device);
+    }
+
+    // ARM (AO=1, Roughness=0.8, Metallic=0.0) -> Plastic-like
+    {
+        hz::u8 data[4] = {255, 204, 0, 255};
+        m_arm_tex.emplace();
+        m_arm_tex->create(1, 1, hz::TextureFormat::RGBA8, data);
+        m_arm_tex->upload_to_gpu(*m_device);
+    }
+
     // Initialize IBL
     m_ibl = std::make_unique<hz::IBL>();
     bool ibl_ready = false;
@@ -140,16 +176,67 @@ void Application::load_assets() {
 }
 
 void Application::setup_scene_entities() {
+    // Player
     auto player_entity = m_scene->create_entity();
     {
         auto& tc = m_scene->registry().emplace<hz::TransformComponent>(player_entity);
-        tc.position = glm::vec3(0.0f, GameConfig::GROUND_LEVEL, 6.0f);
-        tc.rotation = glm::vec3(-12.0f, -90.0f, 0.0f);
+        tc.position = glm::vec3(0.0f, 2.0f, 6.0f);
+        tc.rotation = glm::vec3(-10.0f, 0.0f, 0.0f);
         auto& cc = m_scene->registry().emplace<hz::CameraComponent>(player_entity);
         cc.primary = true;
     }
 
-    // Set up a simple PBR grid or something else if needed
+    // Ground Plane
+    if (m_plane_mesh) {
+        auto plane = m_scene->create_entity();
+        auto& tc = m_scene->registry().emplace<hz::TransformComponent>(plane);
+        tc.position = glm::vec3(0.0f, -1.0f, 0.0f);
+        tc.scale = glm::vec3(1.0f);
+
+        auto& mc = m_scene->registry().emplace<hz::MeshComponent>(plane);
+        mc.mesh_render_ptr = &m_plane_mesh.value();
+        mc.metallic = 0.1f;
+        mc.roughness = 0.8f;
+    }
+
+    // Test Cube
+    if (m_cube_mesh) {
+        auto cube = m_scene->create_entity();
+        auto& tc = m_scene->registry().emplace<hz::TransformComponent>(cube);
+        tc.position = glm::vec3(-2.0f, 1.0f, 0.0f);
+
+        auto& mc = m_scene->registry().emplace<hz::MeshComponent>(cube);
+        mc.mesh_render_ptr = &m_cube_mesh.value();
+        mc.albedo_color = glm::vec3(1.0f, 0.2f, 0.2f); // Reddish
+        mc.metallic = 0.9f;
+        mc.roughness = 0.1f;
+    }
+
+    // Test Sphere
+    if (m_sphere_mesh) {
+        auto sphere = m_scene->create_entity();
+        auto& tc = m_scene->registry().emplace<hz::TransformComponent>(sphere);
+        tc.position = glm::vec3(2.0f, 1.0f, 0.0f);
+
+        auto& mc = m_scene->registry().emplace<hz::MeshComponent>(sphere);
+        mc.mesh_render_ptr = &m_sphere_mesh.value();
+        mc.albedo_color = glm::vec3(0.2f, 1.0f, 0.2f); // Greenish
+        mc.metallic = 0.0f;
+        mc.roughness = 0.2f;
+    }
+
+    // Point Light
+    auto light = m_scene->create_entity();
+    {
+        auto& tc = m_scene->registry().emplace<hz::TransformComponent>(light);
+        tc.position = glm::vec3(0.0f, 3.0f, 2.0f);
+
+        auto& lc = m_scene->registry().emplace<hz::LightComponent>(light);
+        lc.type = hz::LightType::Point;
+        lc.color = glm::vec3(1.0f, 0.8f, 0.5f);
+        lc.intensity = 10.0f;
+        lc.range = 20.0f;
+    }
 }
 
 void Application::run() {
@@ -161,8 +248,26 @@ void Application::run() {
 }
 
 void Application::on_update(float dt) {
+    m_lifetime_system.update(*m_scene, dt);
     m_physics_system.update(*m_scene, *m_physics, dt);
+
+    // Find player camera for character system
+    glm::vec3 cam_pos(0.0f);
+    glm::vec3 cam_rot(0.0f);
+    auto view = m_scene->registry().view<hz::TransformComponent, hz::CameraComponent>();
+    for (auto entity : view) {
+        auto& cc = view.get<hz::CameraComponent>(entity);
+        if (cc.primary) {
+            auto& tc = view.get<hz::TransformComponent>(entity);
+            cam_pos = tc.position;
+            cam_rot = tc.rotation;
+            break;
+        }
+    }
+    m_character_system.update(*m_scene, cam_pos, cam_rot);
+
     m_player_system.update(*m_scene, *m_input, *m_window, dt);
+    m_animation_system.update(*m_scene, dt);
 
     if (m_input->is_action_just_pressed(hz::InputManager::ACTION_MENU)) {
         m_window->close();
@@ -219,6 +324,26 @@ void Application::on_render([[maybe_unused]] float alpha) {
 
     // === Geometry Pass ===
     m_renderer->begin_geometry_pass(*cmd, camera);
+
+    // Render entities
+    {
+        auto group =
+            m_scene->registry().group<hz::TransformComponent>(entt::get<hz::MeshComponent>);
+        for (auto entity : group) {
+            auto [tc, mc] = group.get<hz::TransformComponent, hz::MeshComponent>(entity);
+
+            if (mc.mesh_render_ptr && mc.mesh_render_ptr->is_uploaded()) {
+                // Push Model Matrix
+                glm::mat4 model = tc.get_transform();
+                cmd->push_constants(*m_renderer->get_geometry_layout(),
+                                    hz::rhi::ShaderStage::Vertex, model);
+
+                // Draw
+                mc.mesh_render_ptr->draw(*cmd);
+            }
+        }
+    }
+
     m_renderer->end_geometry_pass(*cmd);
 
     // === Lighting Pass ===

@@ -323,6 +323,10 @@ public:
 
     [[nodiscard]] u32 get_final_output() const;
 
+    [[nodiscard]] const rhi::PipelineLayout* get_geometry_layout() const {
+        return m_geometry_layout.get();
+    }
+
 private:
     // Debug accessors (returning Views)
     [[nodiscard]] rhi::TextureView* get_gbuffer_albedo() const {
