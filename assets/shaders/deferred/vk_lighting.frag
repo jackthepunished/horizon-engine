@@ -24,6 +24,7 @@ layout(set = 1, binding = 0) uniform sampler2D u_GBufAlbedoMetallic;
 layout(set = 1, binding = 1) uniform sampler2D u_GBufNormalRoughness;
 layout(set = 1, binding = 2) uniform sampler2D u_GBufEmissionID;
 layout(set = 1, binding = 3) uniform sampler2D u_GBufDepth;
+layout(set = 1, binding = 4) uniform sampler2DArray u_ShadowMap;
 
 // Light data (set 2)
 layout(set = 2, binding = 0) uniform LightUBO {
@@ -40,6 +41,12 @@ struct GPUPointLight {
 layout(set = 2, binding = 1) readonly buffer PointLightSSBO {
     GPUPointLight point_lights[];
 };
+
+layout(set = 2, binding = 2) uniform ShadowUBO {
+    mat4 light_space_matrices[4];
+    vec4 cascade_splits;
+    vec4 params; // x=enabled, y=bias
+} shadows;
 
 // --------------------------------------------------------------------------
 // Constants
@@ -69,6 +76,50 @@ vec3 reconstruct_world_pos(vec2 uv, float depth) {
     ndc.y = -ndc.y;
     vec4 world = inverse(camera.view_projection) * ndc;
     return world.xyz / world.w;
+}
+
+// --------------------------------------------------------------------------
+// Shadow Calculation (CSM + PCF)
+// --------------------------------------------------------------------------
+float shadow_calculation(vec3 world_pos, vec3 N, vec3 L) {
+    vec4 view_pos = camera.view * vec4(world_pos, 1.0);
+    float depth_value = abs(view_pos.z);
+
+    int layer = -1;
+    for (int i = 0; i < 4; ++i) {
+        if (depth_value < shadows.cascade_splits[i]) {
+            layer = i;
+            break;
+        }
+    }
+    if (layer == -1) layer = 3;
+
+    vec4 light_space_pos = shadows.light_space_matrices[layer] * vec4(world_pos, 1.0);
+    vec3 proj_coords = light_space_pos.xyz / light_space_pos.w;
+    
+    // Vulkan UV: [0,1], Z: [0,1]
+    // CSM matrices usually map to [0,1] already if configured for Vulkan clip space
+    // Assuming standard ortho mapping [-1,1] -> [0,1] xy
+    proj_coords.xy = proj_coords.xy * 0.5 + 0.5;
+
+    // Check depth range
+    if (proj_coords.z > 1.0) return 0.0;
+
+    // Bias
+    float bias = max(shadows.params.y * (1.0 - dot(N, L)), 0.0005);
+    
+    // PCF
+    float shadow = 0.0;
+    vec2 texel_size = 1.0 / textureSize(u_ShadowMap, 0).xy;
+    for(int x = -1; x <= 1; ++x) {
+        for(int y = -1; y <= 1; ++y) {
+            float pcf_depth = texture(u_ShadowMap, vec3(proj_coords.xy + vec2(x, y) * texel_size, layer)).r; 
+            shadow += (proj_coords.z - bias > pcf_depth ? 1.0 : 0.0);        
+        }    
+    }
+    shadow /= 9.0;
+    
+    return shadow;
 }
 
 // --------------------------------------------------------------------------
@@ -172,7 +223,13 @@ void main() {
     {
         vec3  L = normalize(lights.sun_direction.xyz);
         float intensity = lights.sun_color.w;
-        Lo += evaluate_light(N, V, L, lights.sun_color.rgb, intensity,
+        
+        float shadow = 0.0;
+        if (shadows.params.x > 0.5) {
+             shadow = shadow_calculation(world_pos, N, L);
+        }
+
+        Lo += (1.0 - shadow) * evaluate_light(N, V, L, lights.sun_color.rgb, intensity,
                              albedo, metallic, roughness, F0);
     }
 

@@ -26,6 +26,13 @@ struct alignas(16) DeferredLightUBO {
     glm::uvec4 light_counts; // x = point count, y = spot count, z/w = reserved
 };
 
+// Matches std140 layout used by vk_lighting.frag
+struct alignas(16) DeferredShadowUBO {
+    glm::mat4 light_space_matrices[4];
+    glm::vec4 cascade_splits; // x,y,z,w = split depths (in view space z)
+    glm::vec4 params;         // x=enabled, y=soft_shadows, z=shadow_bias, w=unused
+};
+
 constexpr u32 kMaxDeferredPointLights = 256;
 constexpr u32 kMaxDeferredSpotLights = 256;
 

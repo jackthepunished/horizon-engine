@@ -439,10 +439,12 @@ private:
     std::unique_ptr<rhi::Buffer> m_camera_ubo;
     std::unique_ptr<rhi::Buffer> m_light_ubo;
     std::unique_ptr<rhi::Buffer> m_point_light_ssbo;
+    std::unique_ptr<rhi::Buffer> m_shadow_ubo;
 
     // Samplers
     std::unique_ptr<rhi::Sampler> m_linear_sampler;
     std::unique_ptr<rhi::Sampler> m_nearest_sampler;
+    std::unique_ptr<rhi::Sampler> m_shadow_sampler;
 
     // Frustum planes
     std::array<glm::vec4, 6> m_frustum_planes;

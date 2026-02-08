@@ -303,6 +303,9 @@ bool DeferredRenderer::init() {
         if (m_point_light_ssbo) {
             m_lighting_data_set->write_storage_buffer(1, *m_point_light_ssbo);
         }
+        if (m_shadow_ubo) {
+            m_lighting_data_set->write_buffer(2, *m_shadow_ubo);
+        }
     }
 
     update_gbuffer_descriptor_set();
@@ -555,6 +558,18 @@ void DeferredRenderer::execute_lighting_pass(
             std::span<const GPUPointLight>(point_lights.data(), point_light_count));
     }
 
+    if (m_shadow_ubo) {
+        DeferredShadowUBO shadow_data;
+        for (u32 i = 0; i < 4; ++i) {
+            shadow_data.light_space_matrices[i] = m_csm.cascades[i].view_projection;
+        }
+        shadow_data.cascade_splits =
+            glm::vec4(m_csm.cascades[0].split_depth, m_csm.cascades[1].split_depth,
+                      m_csm.cascades[2].split_depth, m_csm.cascades[3].split_depth);
+        shadow_data.params = glm::vec4(1.0f, 0.005f, 0.0f, 0.0f); // Enabled, Bias
+        m_shadow_ubo->upload(shadow_data);
+    }
+
     // 2. Transition Lighting Texture to RenderTarget
     {
         rhi::TextureBarrier b;
@@ -722,7 +737,7 @@ void DeferredRenderer::create_pipelines() {
         m_material_layout = m_device.create_descriptor_set_layout(desc);
     }
 
-    // GBuffer input layout (set 1: GBuffer textures for lighting pass)
+    // GBuffer input layout (set 1: GBuffer textures + Shadow Map)
     {
         rhi::DescriptorSetLayoutDesc desc;
         desc.bindings.push_back(
@@ -733,16 +748,20 @@ void DeferredRenderer::create_pipelines() {
             rhi::DescriptorBinding::combined_image_sampler(2, rhi::ShaderStage::Fragment));
         desc.bindings.push_back(
             rhi::DescriptorBinding::combined_image_sampler(3, rhi::ShaderStage::Fragment));
+        desc.bindings.push_back(
+            rhi::DescriptorBinding::combined_image_sampler(4, rhi::ShaderStage::Fragment));
         m_gbuffer_input_layout = m_device.create_descriptor_set_layout(desc);
     }
 
-    // Lighting data layout (set 2: LightUBO + PointLightSSBO)
+    // Lighting data layout (set 2: LightUBO + PointLightSSBO + ShadowUBO)
     {
         rhi::DescriptorSetLayoutDesc desc;
         desc.bindings.push_back(
             rhi::DescriptorBinding::uniform_buffer(0, rhi::ShaderStage::Fragment));
         desc.bindings.push_back(
             rhi::DescriptorBinding::storage_buffer(1, rhi::ShaderStage::Fragment));
+        desc.bindings.push_back(
+            rhi::DescriptorBinding::uniform_buffer(2, rhi::ShaderStage::Fragment));
         m_lighting_data_layout = m_device.create_descriptor_set_layout(desc);
     }
 
@@ -940,14 +959,11 @@ void DeferredRenderer::create_pipelines() {
     m_composite_input_set = m_descriptor_pool->allocate(*m_composite_input_layout);
 
     // Create UBO buffers
-    m_camera_ubo = m_device.create_uniform_buffer(sizeof(DeferredCameraUBO), "CameraUBO");
-    m_light_ubo = m_device.create_uniform_buffer(sizeof(DeferredLightUBO), "LightUBO");
-
-    m_camera_set->write_buffer(0, *m_camera_ubo);
-    m_lighting_data_set->write_buffer(0, *m_light_ubo);
-    if (m_point_light_ssbo) {
-        m_lighting_data_set->write_storage_buffer(1, *m_point_light_ssbo);
-    }
+    m_camera_ubo =
+        m_device.create_uniform_buffer(sizeof(glm::mat4) * 4 + sizeof(glm::vec4), "CameraUBO");
+    m_light_ubo =
+        m_device.create_uniform_buffer(sizeof(glm::vec4) * 2 + sizeof(glm::uvec4), "LightUBO");
+    m_shadow_ubo = m_device.create_uniform_buffer(sizeof(DeferredShadowUBO), "ShadowUBO");
 
     // Create samplers
     {
@@ -975,6 +991,12 @@ void DeferredRenderer::create_pipelines() {
         m_nearest_sampler = m_device.create_sampler(desc);
     }
 
+    {
+        rhi::SamplerDesc desc = rhi::SamplerDesc::shadow();
+        desc.debug_name = "ShadowSampler";
+        m_shadow_sampler = m_device.create_sampler(desc);
+    }
+
     HZ_LOG_INFO("Deferred renderer pipelines created");
 }
 
@@ -990,6 +1012,10 @@ void DeferredRenderer::update_gbuffer_descriptor_set() {
     m_gbuffer_input_set->write_texture(2, *m_gbuffer.color_views[GBUFFER_EMISSION_ID],
                                        *m_nearest_sampler);
     m_gbuffer_input_set->write_texture(3, *m_gbuffer.depth_view, *m_nearest_sampler);
+
+    if (m_csm.depth_array_view && m_shadow_sampler) {
+        m_gbuffer_input_set->write_texture(4, *m_csm.depth_array_view, *m_shadow_sampler);
+    }
 }
 
 void DeferredRenderer::update_composite_descriptor_set() {
