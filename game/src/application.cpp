@@ -385,7 +385,30 @@ void Application::on_render([[maybe_unused]] float alpha) {
     // Shadow setup logic skipped
 
     // === Shadow Pass ===
-    m_renderer->render_shadows(*cmd, -glm::normalize(sun_dir));
+    m_renderer->update_csm(camera, sun_dir);
+
+    for (hz::u32 i = 0; i < m_renderer->get_shadow_cascade_count(); ++i) {
+        m_renderer->begin_shadow_pass(*cmd, i);
+        glm::mat4 light_vp = m_renderer->get_shadow_view_projection(i);
+
+        auto group =
+            m_scene->registry().group<hz::TransformComponent>(entt::get<hz::MeshComponent>);
+        for (auto entity : group) {
+            auto [tc, mc] = group.get<hz::TransformComponent, hz::MeshComponent>(entity);
+            if (!mc.cast_shadows)
+                continue;
+
+            const hz::Mesh* mesh = resolve_mesh(mc);
+            if (mesh) {
+                glm::mat4 model = tc.get_transform();
+                glm::mat4 mvp = light_vp * model;
+                cmd->push_constants(*m_renderer->get_shadow_layout(), hz::rhi::ShaderStage::Vertex,
+                                    mvp);
+                mesh->draw(*cmd);
+            }
+        }
+        m_renderer->end_shadow_pass(*cmd);
+    }
 
     // === Geometry Pass ===
     m_renderer->begin_geometry_pass(*cmd, camera);
@@ -402,24 +425,8 @@ void Application::on_render([[maybe_unused]] float alpha) {
         for (auto entity : group) {
             auto [tc, mc] = group.get<hz::TransformComponent, hz::MeshComponent>(entity);
 
-            const hz::Mesh* mesh_to_draw = nullptr;
-
-            // 1. Runtime pointer (bypass)
-            if (mc.mesh_render_ptr && mc.mesh_render_ptr->is_uploaded()) {
-                mesh_to_draw = mc.mesh_render_ptr;
-            }
-            // 2. Model Handle
-            else if (mc.model.is_valid()) {
-                auto* model = m_assets->get_model(mc.model);
-                if (model && model->mesh_count() > 0) {
-                    const auto& meshes = model->meshes();
-                    if (!meshes.empty() && meshes[0].is_uploaded()) {
-                        mesh_to_draw = &meshes[0];
-                    }
-                }
-            }
-
-            if (mesh_to_draw) {
+            const hz::Mesh* mesh = resolve_mesh(mc);
+            if (mesh) {
                 // Push Model Matrix (Vertex Stage, Offset 0)
                 glm::mat4 model = tc.get_transform();
                 cmd->push_constants(*m_renderer->get_geometry_layout(),
@@ -439,7 +446,7 @@ void Application::on_render([[maybe_unused]] float alpha) {
                                     hz::rhi::ShaderStage::Fragment, mat_params, 64);
 
                 // Draw
-                mesh_to_draw->draw(*cmd);
+                mesh->draw(*cmd);
             }
         }
     }

@@ -141,6 +141,9 @@ private:
     void on_update(float dt);
     void on_render(float alpha);
 
+    // Helper to resolve mesh from component
+    const hz::Mesh* resolve_mesh(const hz::MeshComponent& mc);
+
     // Helper to read shader files
     static std::string read_file(const std::string& path);
 };

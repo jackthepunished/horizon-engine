@@ -92,12 +92,18 @@ void CascadedShadowMap::create(rhi::Device& device, const CascadedShadowConfig& 
     depth_array_texture = device.create_texture(desc);
     depth_array_view = device.create_texture_view(*depth_array_texture); // Full array view
 
-    // Create per-layer views and FBOs
+    // Create per-layer views
     for (u32 i = 0; i < config.cascade_count; ++i) {
-        // We need a way to create view for specific layer
-        // Assuming create_texture_view supports base_layer/layer_count?
-        // If not available in simple API, we might need extended API.
-        // For now, placeholder.
+        rhi::TextureViewDesc view_desc;
+        view_desc.texture = depth_array_texture.get();
+        view_desc.view_type = rhi::TextureType::Texture2D;
+        view_desc.format = desc.format;
+        view_desc.base_mip_level = 0;
+        view_desc.mip_level_count = 1;
+        view_desc.base_array_layer = i;
+        view_desc.array_layer_count = 1;
+        view_desc.debug_name = "CSM Layer View";
+        cascade_views[i] = device.create_texture_view(view_desc);
     }
 }
 
@@ -471,11 +477,58 @@ void DeferredRenderer::end_geometry_pass(rhi::CommandList& cmd) {
     cmd.barriers({}, barriers);
 }
 
-void DeferredRenderer::render_shadows(rhi::CommandList& cmd, const glm::vec3& light_direction) {
-    // For each cascade...
-    // cmd.begin_rendering(cascade_depth_view);
-    // Draw shadow casters
-    // cmd.end_rendering();
+void DeferredRenderer::update_csm(const Camera& camera, const glm::vec3& light_dir) {
+    m_csm.update_cascades(camera, light_dir);
+}
+
+void DeferredRenderer::begin_shadow_pass(rhi::CommandList& cmd, u32 cascade_index) {
+    if (cascade_index >= m_csm.config.cascade_count)
+        return;
+
+    rhi::RenderingInfo render_info{};
+    render_info.render_area = {0, 0, m_csm.config.resolution, m_csm.config.resolution};
+    render_info.layer_count = 1;
+
+    rhi::RenderingAttachment depth_att{};
+    depth_att.view = m_csm.cascade_views[cascade_index].get();
+    depth_att.load_op = rhi::LoadOp::Clear;
+    depth_att.store_op = rhi::StoreOp::Store;
+    depth_att.clear_value = rhi::ClearDepthStencil{1.0f, 0};
+
+    render_info.depth_attachment = &depth_att;
+
+    // Transition depth layer to DepthWrite
+    rhi::TextureBarrier b;
+    b.texture = m_csm.depth_array_texture.get();
+    b.old_state = rhi::ResourceState::Undefined;
+    b.new_state = rhi::ResourceState::DepthWrite;
+    b.base_array_layer = cascade_index;
+    b.array_layer_count = 1;
+    cmd.barrier(b);
+
+    cmd.begin_rendering(render_info);
+
+    cmd.bind_pipeline(*m_shadow_pipeline);
+    cmd.set_viewport_and_scissor({m_csm.config.resolution, m_csm.config.resolution});
+    cmd.set_depth_bias(1.25f, 0.0f, 1.75f);
+}
+
+void DeferredRenderer::end_shadow_pass(rhi::CommandList& cmd) {
+    cmd.end_rendering();
+}
+
+u32 DeferredRenderer::get_shadow_cascade_count() const {
+    return m_csm.config.cascade_count;
+}
+
+glm::mat4 DeferredRenderer::get_shadow_view_projection(u32 cascade_index) const {
+    if (cascade_index >= m_csm.config.cascade_count)
+        return glm::mat4(1.0f);
+    return m_csm.cascades[cascade_index].view_projection;
+}
+
+const rhi::PipelineLayout* DeferredRenderer::get_shadow_layout() const {
+    return m_shadow_layout.get();
 }
 
 void DeferredRenderer::execute_lighting_pass(
@@ -750,6 +803,28 @@ void DeferredRenderer::create_pipelines() {
         m_composite_layout = m_device.create_pipeline_layout(desc);
     }
 
+    // Shadow pipeline layout: push constants (MVP)
+    {
+        rhi::PipelineLayoutDesc desc;
+        rhi::PushConstantRange pc_range;
+        pc_range.stages = rhi::ShaderStage::Vertex;
+        pc_range.offset = 0;
+        pc_range.size = sizeof(glm::mat4);
+        desc.push_constant_ranges.push_back(pc_range);
+        m_shadow_layout = m_device.create_pipeline_layout(desc);
+    }
+
+    // =========================================================================
+    // Render Passes (for compatibility)
+    // =========================================================================
+    m_geometry_pass = m_device.create_render_pass(rhi::RenderPassDesc::gbuffer());
+    m_lighting_pass =
+        m_device.create_render_pass(rhi::RenderPassDesc::simple(rhi::Format::RGBA16_FLOAT));
+    m_composite_pass =
+        m_device.create_render_pass(rhi::RenderPassDesc::simple(m_swapchain.format()));
+    m_shadow_pass =
+        m_device.create_render_pass(rhi::RenderPassDesc::shadow_map(rhi::Format::D32_FLOAT));
+
     // =========================================================================
     // Shader Modules
     // =========================================================================
@@ -764,9 +839,11 @@ void DeferredRenderer::create_pipelines() {
         "assets/shaders/deferred/vk_lighting.frag", rhi::ShaderStage::Fragment, "LightingFrag");
     auto vk_composite_frag = m_device.create_shader_from_file(
         "assets/shaders/deferred/vk_composite.frag", rhi::ShaderStage::Fragment, "CompositeFrag");
+    auto vk_shadow_vert = m_device.create_shader_from_file("assets/shaders/deferred/vk_shadow.vert",
+                                                           rhi::ShaderStage::Vertex, "ShadowVert");
 
     if (!vk_geometry_vert || !vk_geometry_frag || !vk_fullscreen_vert || !vk_lighting_frag ||
-        !vk_composite_frag) {
+        !vk_composite_frag || !vk_shadow_vert) {
         HZ_LOG_ERROR("Failed to load one or more shaders");
         return;
     }
@@ -785,6 +862,7 @@ void DeferredRenderer::create_pipelines() {
         desc.blend = rhi::BlendState::disabled(4);
         desc.multisample = {};
         desc.layout = m_geometry_layout.get();
+        desc.render_pass = m_geometry_pass.get();
         m_geometry_pipeline = m_device.create_graphics_pipeline(desc);
     }
 
@@ -802,6 +880,7 @@ void DeferredRenderer::create_pipelines() {
         desc.blend = rhi::BlendState::disabled(1);
         desc.multisample = {};
         desc.layout = m_lighting_layout.get();
+        desc.render_pass = m_lighting_pass.get();
         m_lighting_pipeline = m_device.create_graphics_pipeline(desc);
     }
 
@@ -819,7 +898,25 @@ void DeferredRenderer::create_pipelines() {
         desc.blend = rhi::BlendState::disabled(1);
         desc.multisample = {};
         desc.layout = m_composite_layout.get();
+        desc.render_pass = m_composite_pass.get();
         m_composite_pipeline = m_device.create_graphics_pipeline(desc);
+    }
+
+    // =========================================================================
+    // Shadow Pipeline
+    // =========================================================================
+    {
+        rhi::GraphicsPipelineDesc desc;
+        desc.vertex_shader = vk_shadow_vert.get();
+        desc.vertex_layout = rhi::VertexInputLayout::standard_vertex();
+        desc.topology = rhi::PrimitiveTopology::TriangleList;
+        desc.rasterization = rhi::RasterizationState::shadow_map();
+        desc.depth_stencil = rhi::DepthStencilState::default_state();
+        desc.blend = rhi::BlendState::disabled(0);
+        desc.multisample = {};
+        desc.layout = m_shadow_layout.get();
+        desc.render_pass = m_shadow_pass.get();
+        m_shadow_pipeline = m_device.create_graphics_pipeline(desc);
     }
 
     // =========================================================================

@@ -278,7 +278,13 @@ public:
     void begin_geometry_pass(rhi::CommandList& cmd, const Camera& camera);
     void end_geometry_pass(rhi::CommandList& cmd);
 
-    void render_shadows(rhi::CommandList& cmd, const glm::vec3& light_direction);
+    // Shadow Pass
+    void update_csm(const Camera& camera, const glm::vec3& light_dir);
+    void begin_shadow_pass(rhi::CommandList& cmd, u32 cascade_index);
+    void end_shadow_pass(rhi::CommandList& cmd);
+    [[nodiscard]] u32 get_shadow_cascade_count() const;
+    [[nodiscard]] glm::mat4 get_shadow_view_projection(u32 cascade_index) const;
+    [[nodiscard]] const rhi::PipelineLayout* get_shadow_layout() const;
 
     void execute_lighting_pass(rhi::CommandList& cmd, const Camera& camera,
                                const std::vector<GPUPointLight>& point_lights,
@@ -406,6 +412,14 @@ private:
     std::unique_ptr<rhi::PipelineLayout> m_lighting_layout;
     std::unique_ptr<rhi::Pipeline> m_composite_pipeline;
     std::unique_ptr<rhi::PipelineLayout> m_composite_layout;
+    std::unique_ptr<rhi::Pipeline> m_shadow_pipeline;
+    std::unique_ptr<rhi::PipelineLayout> m_shadow_layout;
+
+    // Render Passes (for pipeline creation compatibility)
+    std::unique_ptr<rhi::RenderPass> m_geometry_pass;
+    std::unique_ptr<rhi::RenderPass> m_lighting_pass;
+    std::unique_ptr<rhi::RenderPass> m_composite_pass;
+    std::unique_ptr<rhi::RenderPass> m_shadow_pass;
 
     // Descriptor set layouts
     std::unique_ptr<rhi::DescriptorSetLayout> m_camera_layout;

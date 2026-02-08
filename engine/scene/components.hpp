@@ -74,6 +74,8 @@ struct MeshComponent {
     // Runtime render pointer (not serialized)
     const Mesh* mesh_render_ptr{nullptr};
 
+    bool cast_shadows{true};
+
     // ==========================================================================
     // Material (new handle-based system - preferred)
     // ==========================================================================
