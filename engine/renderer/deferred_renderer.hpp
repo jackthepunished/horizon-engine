@@ -411,6 +411,7 @@ private:
     // UBO buffers
     std::unique_ptr<rhi::Buffer> m_camera_ubo;
     std::unique_ptr<rhi::Buffer> m_light_ubo;
+    std::unique_ptr<rhi::Buffer> m_point_light_ssbo;
 
     // Samplers
     std::unique_ptr<rhi::Sampler> m_linear_sampler;

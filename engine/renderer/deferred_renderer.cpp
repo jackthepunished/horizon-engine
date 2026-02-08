@@ -262,6 +262,18 @@ bool DeferredRenderer::init() {
 
     m_gbuffer.create(m_device, m_width, m_height);
 
+    // Create HDR Lighting Texture
+    {
+        rhi::TextureDesc desc;
+        desc.width = m_width;
+        desc.height = m_height;
+        desc.format = rhi::Format::RGBA16_FLOAT;
+        desc.usage = rhi::TextureUsage::RenderTarget | rhi::TextureUsage::Sampled;
+        desc.debug_name = "HDR Lighting Result";
+        m_lighting_texture = m_device.create_texture(desc);
+        m_lighting_view = m_device.create_texture_view(*m_lighting_texture);
+    }
+
     CascadedShadowConfig csm_cfg;
     m_csm.create(m_device, csm_cfg);
 
@@ -271,6 +283,13 @@ bool DeferredRenderer::init() {
     TAAConfig taa_cfg;
     m_taa.create(m_device, m_width, m_height, taa_cfg);
 
+    // Create point light SSBO (max 1024 lights)
+    m_point_light_ssbo =
+        m_device.create_buffer(sizeof(GPUPointLight) * 1024,
+                               rhi::BufferUsage::StorageBuffer | rhi::BufferUsage::TransferDst,
+                               nullptr, // No initial data
+                               rhi::MemoryUsage::CPU_To_GPU, "PointLightSSBO");
+
     m_initialized = true;
     HZ_LOG_INFO("Deferred Renderer Initialized (Vulkan Backed)");
     return true;
@@ -278,6 +297,8 @@ bool DeferredRenderer::init() {
 
 void DeferredRenderer::shutdown() {
     m_gbuffer.destroy();
+    m_lighting_texture.reset();
+    m_lighting_view.reset();
     m_csm.destroy();
     m_ssr.destroy();
     m_taa.destroy();
@@ -294,6 +315,19 @@ void DeferredRenderer::resize(u32 width, u32 height) {
     m_gbuffer.destroy();
     m_gbuffer.create(m_device, m_width, m_height);
 
+    m_lighting_texture.reset();
+    m_lighting_view.reset();
+    {
+        rhi::TextureDesc desc;
+        desc.width = m_width;
+        desc.height = m_height;
+        desc.format = rhi::Format::RGBA16_FLOAT;
+        desc.usage = rhi::TextureUsage::RenderTarget | rhi::TextureUsage::Sampled;
+        desc.debug_name = "HDR Lighting Result";
+        m_lighting_texture = m_device.create_texture(desc);
+        m_lighting_view = m_device.create_texture_view(*m_lighting_texture);
+    }
+
     m_ssr.destroy();
     m_ssr.create(m_device, m_width / 2, m_height / 2, m_ssr.config);
 
@@ -307,28 +341,132 @@ void DeferredRenderer::begin_geometry_pass(rhi::CommandList& cmd, const Camera& 
     if (!m_initialized)
         return;
 
-    // Use dynamic rendering to bind GBuffer targets
-    // cmd.begin_rendering(attachments...);
+    // 1. Update Camera UBO
+    struct CameraData {
+        glm::mat4 view;
+        glm::mat4 projection;
+        glm::mat4 view_projection;
+        glm::vec4 camera_position;
+    } camera_data;
 
-    rhi::RenderPassBeginInfo info{};
-    // Setup color attachments
-    // info.color_attachments... = m_gbuffer.color_views...
-    // info.depth_attachment = m_gbuffer.depth_view...
+    camera_data.view = camera.view_matrix();
+    camera_data.projection =
+        camera.projection_matrix(static_cast<f32>(m_width) / static_cast<f32>(m_height));
+    camera_data.view_projection = camera_data.projection * camera_data.view;
+    camera_data.camera_position = glm::vec4(camera.position(), 1.0f);
 
-    // For now, assume this logic is handled or abstracted
-    // cmd.begin_render_pass(m_gbuffer.fbo.get(), ...); // If using FBOs
+    m_device.update_buffer(*m_camera_ubo, &camera_data, sizeof(CameraData));
 
-    // Bind Pipelines
-    // cmd.bind_pipeline(m_geometry_pipeline);
+    // 2. Transition GBuffer to RenderTarget
+    std::vector<rhi::TextureBarrier> barriers;
+    barriers.reserve(GBUFFER_COUNT + 1);
 
-    // Helper
-    m_csm.update_cascades(camera, glm::vec3(0.0f, -1.0f, 0.0f));
-    // m_gbuffer.bind(); // Legacy name, effectively binds targets
+    for (u32 i = 0; i < GBUFFER_COUNT; ++i) {
+        rhi::TextureBarrier b;
+        b.texture = m_gbuffer.colors[i].get();
+        b.old_state =
+            rhi::ResourceState::ShaderResource; // Assuming it was read last frame or initialized
+        b.new_state = rhi::ResourceState::RenderTarget;
+        barriers.push_back(b);
+    }
+
+    // Depth barrier
+    {
+        rhi::TextureBarrier b;
+        b.texture = m_gbuffer.depth.get();
+        b.old_state = rhi::ResourceState::DepthRead; // Or ShaderResource if sampled
+        b.new_state = rhi::ResourceState::DepthWrite;
+        barriers.push_back(b);
+    }
+
+    cmd.barriers({}, barriers);
+
+    // 3. Begin Dynamic Rendering
+    rhi::RenderingInfo render_info{};
+    render_info.render_area = {0, 0, m_width, m_height};
+    render_info.layer_count = 1;
+
+    // Attachments
+    std::vector<rhi::RenderingAttachment> color_attachments;
+    color_attachments.resize(GBUFFER_COUNT);
+
+    // RT0: Albedo+Metallic (Clear to Black)
+    color_attachments[0].view = m_gbuffer.color_views[0].get();
+    color_attachments[0].load_op = rhi::LoadOp::Clear;
+    color_attachments[0].store_op = rhi::StoreOp::Store;
+    color_attachments[0].clear_value = rhi::ClearColor{0.0f, 0.0f, 0.0f, 0.0f};
+
+    // RT1: Normal+Roughness (Clear to 0,0,0,0 -> decoded normal will be invalid but safe)
+    // Encoded normal 0,0 decodes to roughly 0,0,-1
+    color_attachments[1].view = m_gbuffer.color_views[1].get();
+    color_attachments[1].load_op = rhi::LoadOp::Clear;
+    color_attachments[1].store_op = rhi::StoreOp::Store;
+    color_attachments[1].clear_value =
+        rhi::ClearColor{0.5f, 0.5f, 0.0f, 0.0f}; // 0.5,0.5 encodes normal (0,0,1)
+
+    // RT2: Emission+ID (Clear to Black)
+    color_attachments[2].view = m_gbuffer.color_views[2].get();
+    color_attachments[2].load_op = rhi::LoadOp::Clear;
+    color_attachments[2].store_op = rhi::StoreOp::Store;
+    color_attachments[2].clear_value = rhi::ClearColor{0.0f, 0.0f, 0.0f, 0.0f};
+
+    // RT3: Velocity (Clear to Black)
+    color_attachments[3].view = m_gbuffer.color_views[3].get();
+    color_attachments[3].load_op = rhi::LoadOp::Clear;
+    color_attachments[3].store_op = rhi::StoreOp::Store;
+    color_attachments[3].clear_value = rhi::ClearColor{0.0f, 0.0f, 0.0f, 0.0f};
+
+    render_info.color_attachments = color_attachments;
+
+    // Depth attachment
+    rhi::RenderingAttachment depth_attachment{};
+    depth_attachment.view = m_gbuffer.depth_view.get();
+    depth_attachment.load_op = rhi::LoadOp::Clear;
+    depth_attachment.store_op = rhi::StoreOp::Store;
+    depth_attachment.clear_value = rhi::ClearDepthStencil{1.0f, 0};
+
+    render_info.depth_attachment = &depth_attachment;
+
+    cmd.begin_rendering(render_info);
+
+    // 4. Bind Pipeline & State
+    cmd.bind_pipeline(*m_geometry_pipeline);
+    cmd.set_viewport_and_scissor({m_width, m_height});
+
+    // 5. Update & Bind Camera Descriptor Set
+    // We update the descriptor set here because it changes per frame (camera data)
+    m_camera_set->write_buffer(0, *m_camera_ubo);
+    cmd.bind_descriptor_set(*m_geometry_layout, 0, *m_camera_set);
+
+    m_csm.update_cascades(
+        camera, glm::vec3(0.0f, -1.0f, 0.0f)); // Update shadow cascades (placeholder light dir)
 }
 
 void DeferredRenderer::end_geometry_pass(rhi::CommandList& cmd) {
-    // cmd.end_rendering();
-    // m_gbuffer.unbind(); // Legacy
+    cmd.end_rendering();
+
+    // Transition GBuffer to ShaderResource for lighting pass
+    std::vector<rhi::TextureBarrier> barriers;
+    barriers.reserve(GBUFFER_COUNT + 1);
+
+    for (u32 i = 0; i < GBUFFER_COUNT; ++i) {
+        rhi::TextureBarrier b;
+        b.texture = m_gbuffer.colors[i].get();
+        b.old_state = rhi::ResourceState::RenderTarget;
+        b.new_state = rhi::ResourceState::ShaderResource;
+        barriers.push_back(b);
+    }
+
+    // Depth barrier
+    {
+        rhi::TextureBarrier b;
+        b.texture = m_gbuffer.depth.get();
+        b.old_state = rhi::ResourceState::DepthWrite;
+        b.new_state = rhi::ResourceState::ShaderResource; // For depth sampling in lighting
+        barriers.push_back(b);
+    }
+
+    cmd.barriers({}, barriers);
 }
 
 void DeferredRenderer::render_shadows(rhi::CommandList& cmd, const glm::vec3& light_direction) {
@@ -344,10 +482,98 @@ void DeferredRenderer::execute_lighting_pass(
     const glm::vec3& sun_color, rhi::TextureView* irradiance_map, rhi::TextureView* prefilter_map,
     rhi::TextureView* brdf_lut, rhi::TextureView* environment_map) {
 
-    // Bind Lighting Pipeline
-    // Bind GBuffer textures as descriptors
-    // Bind Light UBOs/SSBOs
+    if (!m_initialized)
+        return;
+
+    // 1. Update Light UBO & SSBO
+    struct LightData {
+        glm::vec4 sun_direction;
+        glm::vec4 sun_color;
+        glm::uvec4 light_counts;
+    } light_data;
+
+    light_data.sun_direction = glm::vec4(sun_direction, 0.0f);
+    light_data.sun_color = glm::vec4(sun_color, 1.0f);
+    light_data.light_counts = glm::uvec4(point_lights.size(), spot_lights.size(), 0, 0);
+
+    m_device.update_buffer(*m_light_ubo, &light_data, sizeof(LightData));
+
+    // Update point lights
+    u32 count = std::min((u32)point_lights.size(), 1024u);
+    if (count > 0) {
+        m_device.update_buffer(*m_point_light_ssbo, point_lights.data(),
+                               count * sizeof(GPUPointLight));
+    }
+
+    // 2. Transition Lighting Texture to RenderTarget
+    {
+        rhi::TextureBarrier b;
+        b.texture = m_lighting_texture.get();
+        b.old_state = rhi::ResourceState::Undefined;
+        b.new_state = rhi::ResourceState::RenderTarget;
+        cmd.barrier(b);
+    }
+
+    // 3. Begin Dynamic Rendering
+    rhi::RenderingInfo render_info{};
+    render_info.render_area = {0, 0, m_width, m_height};
+    render_info.layer_count = 1;
+
+    rhi::RenderingAttachment color_att{};
+    color_att.view = m_lighting_view.get();
+    color_att.load_op = rhi::LoadOp::Clear;
+    color_att.store_op = rhi::StoreOp::Store;
+    color_att.clear_value = rhi::ClearColor{0.0f, 0.0f, 0.0f, 1.0f};
+
+    render_info.color_attachments = {&color_att, 1};
+
+    cmd.begin_rendering(render_info);
+
+    // 4. Bind Pipeline
+    cmd.bind_pipeline(*m_lighting_pipeline);
+    cmd.set_viewport_and_scissor({m_width, m_height});
+
+    // 5. Update & Bind Descriptor Sets
+    cmd.bind_descriptor_set(*m_lighting_layout, 0, *m_camera_set);
+
+    // Set 1: GBuffer Textures
+    {
+        std::vector<rhi::DescriptorWrite> writes;
+        writes.push_back(rhi::DescriptorWrite::combined_image_sampler(0, *m_gbuffer.color_views[0],
+                                                                      *m_nearest_sampler));
+        writes.push_back(rhi::DescriptorWrite::combined_image_sampler(1, *m_gbuffer.color_views[1],
+                                                                      *m_nearest_sampler));
+        writes.push_back(rhi::DescriptorWrite::combined_image_sampler(2, *m_gbuffer.color_views[2],
+                                                                      *m_nearest_sampler));
+        writes.push_back(rhi::DescriptorWrite::combined_image_sampler(3, *m_gbuffer.depth_view,
+                                                                      *m_nearest_sampler));
+        m_gbuffer_input_set->write(writes);
+    }
+    cmd.bind_descriptor_set(*m_lighting_layout, 1, *m_gbuffer_input_set);
+
+    // Set 2: Lights
+    {
+        std::vector<rhi::DescriptorWrite> writes;
+        writes.push_back(rhi::DescriptorWrite::uniform_buffer(0, *m_light_ubo));
+        writes.push_back(rhi::DescriptorWrite::storage_buffer(1, *m_point_light_ssbo));
+        m_lighting_data_set->write(writes);
+    }
+    cmd.bind_descriptor_set(*m_lighting_layout, 2, *m_lighting_data_set);
+
+    // 6. Draw
     render_fullscreen_quad(cmd);
+
+    // 7. End
+    cmd.end_rendering();
+
+    // 8. Transition to ShaderResource
+    {
+        rhi::TextureBarrier b;
+        b.texture = m_lighting_texture.get();
+        b.old_state = rhi::ResourceState::RenderTarget;
+        b.new_state = rhi::ResourceState::ShaderResource;
+        cmd.barrier(b);
+    }
 }
 
 void DeferredRenderer::execute_ssr_pass(rhi::CommandList& cmd, const Camera& camera) {
@@ -397,7 +623,22 @@ void DeferredRenderer::render_to_screen(rhi::CommandList& cmd) {
     // Set viewport/scissor
     cmd.set_viewport_and_scissor({m_width, m_height});
 
-    // TODO: Blit final result with fullscreen quad
+    // Bind Composite Pipeline
+    cmd.bind_pipeline(*m_composite_pipeline);
+
+    // Update & Bind Descriptor Set
+    {
+        std::vector<rhi::DescriptorWrite> writes;
+        writes.push_back(
+            rhi::DescriptorWrite::combined_image_sampler(0, *m_lighting_view, *m_nearest_sampler));
+        m_composite_input_set->write(writes);
+    }
+    cmd.bind_descriptor_set(*m_composite_layout, 0, *m_composite_input_set);
+
+    // Push Constants (Exposure)
+    f32 exposure = 1.0f;
+    cmd.push_constants(*m_composite_layout, rhi::ShaderStage::Fragment, exposure);
+
     render_fullscreen_quad(cmd);
 
     cmd.end_rendering();
@@ -459,14 +700,32 @@ void DeferredRenderer::create_pipelines() {
     {
         rhi::DescriptorSetLayoutDesc desc;
         desc.bindings.push_back(
-            rhi::DescriptorBinding::sampled_image(0, rhi::ShaderStage::Fragment));
+            rhi::DescriptorBinding::combined_image_sampler(0, rhi::ShaderStage::Fragment));
         desc.bindings.push_back(
-            rhi::DescriptorBinding::sampled_image(1, rhi::ShaderStage::Fragment));
+            rhi::DescriptorBinding::combined_image_sampler(1, rhi::ShaderStage::Fragment));
         desc.bindings.push_back(
-            rhi::DescriptorBinding::sampled_image(2, rhi::ShaderStage::Fragment));
+            rhi::DescriptorBinding::combined_image_sampler(2, rhi::ShaderStage::Fragment));
         desc.bindings.push_back(
-            rhi::DescriptorBinding::sampled_image(3, rhi::ShaderStage::Fragment));
+            rhi::DescriptorBinding::combined_image_sampler(3, rhi::ShaderStage::Fragment));
         m_gbuffer_input_layout = m_device.create_descriptor_set_layout(desc);
+    }
+
+    // Lighting data layout (set 2: LightUBO + PointLightSSBO)
+    {
+        rhi::DescriptorSetLayoutDesc desc;
+        desc.bindings.push_back(
+            rhi::DescriptorBinding::uniform_buffer(0, rhi::ShaderStage::Fragment));
+        desc.bindings.push_back(
+            rhi::DescriptorBinding::storage_buffer(1, rhi::ShaderStage::Fragment));
+        m_lighting_data_layout = m_device.create_descriptor_set_layout(desc);
+    }
+
+    // Composite input layout (set 0: HDR result texture)
+    {
+        rhi::DescriptorSetLayoutDesc desc;
+        desc.bindings.push_back(
+            rhi::DescriptorBinding::combined_image_sampler(0, rhi::ShaderStage::Fragment));
+        m_composite_input_layout = m_device.create_descriptor_set_layout(desc);
     }
 
     // Lighting data layout (set 2: LightUBO + PointLightSSBO)
@@ -620,7 +879,8 @@ void DeferredRenderer::create_pipelines() {
     // Create UBO buffers
     m_camera_ubo =
         m_device.create_uniform_buffer(sizeof(glm::mat4) * 4 + sizeof(glm::vec4), "CameraUBO");
-    m_light_ubo = m_device.create_uniform_buffer(sizeof(glm::vec4) * 2 + sizeof(uvec4), "LightUBO");
+    m_light_ubo =
+        m_device.create_uniform_buffer(sizeof(glm::vec4) * 2 + sizeof(glm::uvec4), "LightUBO");
 
     // Create samplers
     {
@@ -628,11 +888,12 @@ void DeferredRenderer::create_pipelines() {
         desc.min_filter = rhi::Filter::Linear;
         desc.mag_filter = rhi::Filter::Linear;
         desc.mipmap_mode = rhi::MipmapMode::Linear;
-        desc.address_mode_u = rhi::AddressMode::Repeat;
-        desc.address_mode_v = rhi::AddressMode::Repeat;
-        desc.address_mode_w = rhi::AddressMode::Repeat;
+        desc.address_u = rhi::AddressMode::Repeat;
+        desc.address_v = rhi::AddressMode::Repeat;
+        desc.address_w = rhi::AddressMode::Repeat;
         desc.max_anisotropy = 16.0f;
-        m_linear_sampler = m_device.create_sampler(desc, "LinearSampler");
+        desc.debug_name = "LinearSampler";
+        m_linear_sampler = m_device.create_sampler(desc);
     }
 
     {
@@ -640,10 +901,11 @@ void DeferredRenderer::create_pipelines() {
         desc.min_filter = rhi::Filter::Nearest;
         desc.mag_filter = rhi::Filter::Nearest;
         desc.mipmap_mode = rhi::MipmapMode::Nearest;
-        desc.address_mode_u = rhi::AddressMode::ClampToEdge;
-        desc.address_mode_v = rhi::AddressMode::ClampToEdge;
-        desc.address_mode_w = rhi::AddressMode::ClampToEdge;
-        m_nearest_sampler = m_device.create_sampler(desc, "NearestSampler");
+        desc.address_u = rhi::AddressMode::ClampToEdge;
+        desc.address_v = rhi::AddressMode::ClampToEdge;
+        desc.address_w = rhi::AddressMode::ClampToEdge;
+        desc.debug_name = "NearestSampler";
+        m_nearest_sampler = m_device.create_sampler(desc);
     }
 
     HZ_LOG_INFO("Deferred renderer pipelines created");
@@ -662,8 +924,8 @@ void DeferredRenderer::create_fullscreen_quad() {
 
 void DeferredRenderer::render_fullscreen_quad(rhi::CommandList& cmd) const {
     if (m_quad_vb) {
-        // cmd.bind_vertex_buffer(0, *m_quad_vb);
-        // cmd.draw(4, 1, 0, 0);
+        cmd.bind_vertex_buffer(0, *m_quad_vb);
+        cmd.draw(4, 1, 0, 0);
     }
 }
 
