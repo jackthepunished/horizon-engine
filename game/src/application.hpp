@@ -107,6 +107,9 @@ private:
     hz::rhi::TextureView* m_brdf_lut{nullptr};
     hz::rhi::TextureView* m_environment_map{nullptr};
 
+    // Default Material Set
+    std::unique_ptr<hz::rhi::DescriptorSet> m_default_material_set;
+
     // UI state
     bool m_show_grid{false};
     bool m_show_model{true};

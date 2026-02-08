@@ -274,6 +274,7 @@ bool DeferredRenderer::init() {
         m_lighting_texture = m_device.create_texture(desc);
         m_lighting_view = m_device.create_texture_view(*m_lighting_texture);
     }
+    update_composite_descriptor_set();
 
     CascadedShadowConfig csm_cfg;
     m_csm.create(m_device, csm_cfg);
@@ -331,6 +332,7 @@ void DeferredRenderer::resize(u32 width, u32 height) {
         m_lighting_texture = m_device.create_texture(desc);
         m_lighting_view = m_device.create_texture_view(*m_lighting_texture);
     }
+    update_composite_descriptor_set();
 
     m_ssr.destroy();
     m_ssr.create(m_device, m_width / 2, m_height / 2, m_ssr.config);
@@ -592,8 +594,7 @@ void DeferredRenderer::render_to_screen(rhi::CommandList& cmd) {
     // Bind Composite Pipeline
     cmd.bind_pipeline(*m_composite_pipeline);
 
-    // Update & Bind Descriptor Set
-    m_composite_input_set->write_texture(0, *m_lighting_view, *m_nearest_sampler);
+    // Bind Descriptor Set
     cmd.bind_descriptor_set(*m_composite_layout, 0, *m_composite_input_set);
 
     // Push Constants (Exposure)
@@ -697,16 +698,27 @@ void DeferredRenderer::create_pipelines() {
     // Pipeline Layouts
     // =========================================================================
 
-    // Geometry pipeline layout: set 0 (camera), set 1 (material), push constants (model)
+    // Geometry pipeline layout: set 0 (camera), set 1 (material), push constants (model + material)
     {
         rhi::PipelineLayoutDesc desc;
         desc.set_layouts.push_back(m_camera_layout.get());
         desc.set_layouts.push_back(m_material_layout.get());
-        rhi::PushConstantRange pc_range;
-        pc_range.stages = rhi::ShaderStage::Vertex;
-        pc_range.offset = 0;
-        pc_range.size = sizeof(glm::mat4);
-        desc.push_constant_ranges.push_back(pc_range);
+
+        // Vertex: Model Matrix (64 bytes)
+        rhi::PushConstantRange pc_vert;
+        pc_vert.stages = rhi::ShaderStage::Vertex;
+        pc_vert.offset = 0;
+        pc_vert.size = sizeof(glm::mat4);
+        desc.push_constant_ranges.push_back(pc_vert);
+
+        // Fragment: Material Params (offset 64, size 24)
+        // vec4 albedo + float roughness + float metallic
+        rhi::PushConstantRange pc_frag;
+        pc_frag.stages = rhi::ShaderStage::Fragment;
+        pc_frag.offset = 64;
+        pc_frag.size = sizeof(glm::vec4) + sizeof(f32) * 2;
+        desc.push_constant_ranges.push_back(pc_frag);
+
         m_geometry_layout = m_device.create_pipeline_layout(desc);
     }
 
@@ -876,6 +888,14 @@ void DeferredRenderer::update_gbuffer_descriptor_set() {
     m_gbuffer_input_set->write_texture(3, *m_gbuffer.depth_view, *m_nearest_sampler);
 }
 
+void DeferredRenderer::update_composite_descriptor_set() {
+    if (!m_composite_input_set || !m_nearest_sampler || !m_lighting_view) {
+        return;
+    }
+
+    m_composite_input_set->write_texture(0, *m_lighting_view, *m_nearest_sampler);
+}
+
 void DeferredRenderer::create_fullscreen_quad() {
     float vertices[] = {
         // positions        // texture Coords
@@ -893,6 +913,20 @@ void DeferredRenderer::render_fullscreen_quad(rhi::CommandList& cmd) const {
         cmd.bind_vertex_buffer(0, *m_quad_vb);
         cmd.draw(6, 1, 0, 0);
     }
+}
+
+std::unique_ptr<rhi::DescriptorSet> DeferredRenderer::create_material_descriptor_set(
+    const rhi::TextureView& albedo, const rhi::TextureView& normal, const rhi::TextureView& arm) {
+
+    auto set = m_descriptor_pool->allocate(*m_material_layout);
+
+    std::vector<rhi::DescriptorWrite> writes;
+    writes.push_back(rhi::DescriptorWrite::combined_image_sampler(0, albedo, *m_linear_sampler));
+    writes.push_back(rhi::DescriptorWrite::combined_image_sampler(1, normal, *m_linear_sampler));
+    writes.push_back(rhi::DescriptorWrite::combined_image_sampler(2, arm, *m_linear_sampler));
+
+    set->write(writes);
+    return set;
 }
 
 void DeferredRenderer::update_frustum(const Camera& camera) {

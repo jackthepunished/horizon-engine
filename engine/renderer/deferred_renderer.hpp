@@ -323,6 +323,13 @@ public:
 
     [[nodiscard]] u32 get_final_output() const;
 
+    /**
+     * @brief Create a material descriptor set
+     */
+    [[nodiscard]] std::unique_ptr<rhi::DescriptorSet>
+    create_material_descriptor_set(const rhi::TextureView& albedo, const rhi::TextureView& normal,
+                                   const rhi::TextureView& arm);
+
     [[nodiscard]] const rhi::PipelineLayout* get_geometry_layout() const {
         return m_geometry_layout.get();
     }
@@ -349,6 +356,7 @@ private:
     void create_fullscreen_quad();
     void render_fullscreen_quad(rhi::CommandList& cmd) const;
     void update_gbuffer_descriptor_set();
+    void update_composite_descriptor_set();
 
     rhi::Device& m_device;
     rhi::Swapchain& m_swapchain;

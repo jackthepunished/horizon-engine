@@ -21,6 +21,13 @@ layout(set = 1, binding = 0) uniform sampler2D u_AlbedoMap;
 layout(set = 1, binding = 1) uniform sampler2D u_NormalMap;
 layout(set = 1, binding = 2) uniform sampler2D u_ARMMap; // AO, Roughness, Metallic packed
 
+// Push Constants (offset 64 to skip model matrix)
+layout(push_constant) uniform PushConstants {
+    layout(offset = 64) vec4 albedo_factor;
+    layout(offset = 80) float roughness_factor;
+    layout(offset = 84) float metallic_factor;
+} pc;
+
 // GBuffer outputs
 layout(location = 0) out vec4 gAlbedoMetallic;
 layout(location = 1) out vec4 gNormalRoughness;
@@ -64,10 +71,13 @@ void main() {
     vec3 normal_sample = texture(u_NormalMap, v_TexCoord).rgb;
     vec3 arm_sample    = texture(u_ARMMap, v_TexCoord).rgb;
 
+    // Apply factors
+    vec3 albedo = albedo_sample.rgb * pc.albedo_factor.rgb;
+    
     // Unpack ARM: R=AO, G=Roughness, B=Metallic
     float ao        = arm_sample.r;
-    float roughness = arm_sample.g;
-    float metallic  = arm_sample.b;
+    float roughness = arm_sample.g * pc.roughness_factor;
+    float metallic  = arm_sample.b * pc.metallic_factor;
 
     // Apply normal mapping
     vec3 world_normal = apply_normal_map(normal_sample, v_Normal, v_Tangent);
@@ -76,7 +86,7 @@ void main() {
     vec2 encoded_normal = encode_octahedron(world_normal);
 
     // Write GBuffer
-    gAlbedoMetallic  = vec4(albedo_sample.rgb, metallic);
+    gAlbedoMetallic  = vec4(albedo, metallic);
     gNormalRoughness = vec4(encoded_normal, roughness, ao);
     gEmissionID      = vec4(0.0, 0.0, 0.0, 0.0); // No emission for now; material ID = 0
     gVelocity        = vec2(0.0, 0.0);             // Static objects: zero velocity

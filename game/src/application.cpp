@@ -173,6 +173,15 @@ void Application::load_assets() {
     } else {
         HZ_LOG_WARN("IBL initialization temporarily disabled during refactor");
     }
+
+    // Create default material set
+    if (m_albedo_tex && m_normal_tex && m_arm_tex && m_albedo_tex->is_uploaded() &&
+        m_normal_tex->is_uploaded() && m_arm_tex->is_uploaded()) {
+        m_default_material_set = m_renderer->create_material_descriptor_set(
+            *m_albedo_tex->rhi_view(), *m_normal_tex->rhi_view(), *m_arm_tex->rhi_view());
+    } else {
+        HZ_ERROR("Failed to create default material descriptor set: Textures not ready");
+    }
 }
 
 void Application::setup_scene_entities() {
@@ -306,6 +315,13 @@ void Application::on_render([[maybe_unused]] float alpha) {
 
     // 1. Acquire Image
     if (!m_swapchain->acquire_next_image(m_image_available_sems[m_current_frame].get())) {
+        // Handle resize (swapchain out of date)
+        auto [width, height] = m_window->framebuffer_size();
+        if (width > 0 && height > 0) {
+            m_device->wait_idle();
+            m_swapchain->resize(width, height);
+            m_renderer->resize(width, height);
+        }
         m_device->end_frame();
         return;
     }
@@ -325,6 +341,11 @@ void Application::on_render([[maybe_unused]] float alpha) {
     // === Geometry Pass ===
     m_renderer->begin_geometry_pass(*cmd, camera);
 
+    // Bind default material set (Set 1)
+    if (m_default_material_set) {
+        cmd->bind_descriptor_set(*m_renderer->get_geometry_layout(), 1, *m_default_material_set);
+    }
+
     // Render entities
     {
         auto group =
@@ -333,10 +354,23 @@ void Application::on_render([[maybe_unused]] float alpha) {
             auto [tc, mc] = group.get<hz::TransformComponent, hz::MeshComponent>(entity);
 
             if (mc.mesh_render_ptr && mc.mesh_render_ptr->is_uploaded()) {
-                // Push Model Matrix
+                // Push Model Matrix (Vertex Stage, Offset 0)
                 glm::mat4 model = tc.get_transform();
                 cmd->push_constants(*m_renderer->get_geometry_layout(),
-                                    hz::rhi::ShaderStage::Vertex, model);
+                                    hz::rhi::ShaderStage::Vertex, model, 0);
+
+                // Push Material Params (Fragment Stage, Offset 64)
+                struct MatParams {
+                    glm::vec4 albedo;
+                    float roughness;
+                    float metallic;
+                } mat_params;
+                mat_params.albedo = glm::vec4(mc.albedo_color, 1.0f);
+                mat_params.roughness = mc.roughness;
+                mat_params.metallic = mc.metallic;
+
+                cmd->push_constants(*m_renderer->get_geometry_layout(),
+                                    hz::rhi::ShaderStage::Fragment, mat_params, 64);
 
                 // Draw
                 mc.mesh_render_ptr->draw(*cmd);
