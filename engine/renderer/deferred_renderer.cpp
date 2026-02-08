@@ -292,6 +292,13 @@ bool DeferredRenderer::init() {
                                 .memory = rhi::MemoryUsage::CPU_To_GPU,
                                 .debug_name = "PointLightSSBO"});
 
+    if (m_lighting_data_set && m_light_ubo) {
+        m_lighting_data_set->write_buffer(0, *m_light_ubo);
+        if (m_point_light_ssbo) {
+            m_lighting_data_set->write_storage_buffer(1, *m_point_light_ssbo);
+        }
+    }
+
     update_gbuffer_descriptor_set();
 
     m_initialized = true;
@@ -915,7 +922,7 @@ void DeferredRenderer::render_fullscreen_quad(rhi::CommandList& cmd) const {
     }
 }
 
-std::unique_ptr<rhi::DescriptorSet> DeferredRenderer::create_material_descriptor_set(
+[[nodiscard]] std::unique_ptr<rhi::DescriptorSet> DeferredRenderer::create_material_descriptor_set(
     const rhi::TextureView& albedo, const rhi::TextureView& normal, const rhi::TextureView& arm) {
 
     auto set = m_descriptor_pool->allocate(*m_material_layout);
