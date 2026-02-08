@@ -262,7 +262,6 @@ bool DeferredRenderer::init() {
     create_pipelines(); // Need to implement this
 
     m_gbuffer.create(m_device, m_width, m_height);
-    update_gbuffer_descriptor_set();
 
     // Create HDR Lighting Texture
     {
@@ -291,6 +290,8 @@ bool DeferredRenderer::init() {
                                 .usage = rhi::BufferUsage::StorageBuffer,
                                 .memory = rhi::MemoryUsage::CPU_To_GPU,
                                 .debug_name = "PointLightSSBO"});
+
+    update_gbuffer_descriptor_set();
 
     m_initialized = true;
     HZ_LOG_INFO("Deferred Renderer Initialized (Vulkan Backed)");
@@ -347,7 +348,9 @@ void DeferredRenderer::begin_geometry_pass(rhi::CommandList& cmd, const Camera& 
     const float aspect = static_cast<float>(m_width) / static_cast<float>(m_height);
     const auto camera_ubo = make_deferred_camera_ubo(
         camera.view_matrix(), camera.projection_matrix(aspect), camera.position());
-    m_camera_ubo->upload(camera_ubo);
+    if (m_camera_ubo) {
+        m_camera_ubo->upload(camera_ubo);
+    }
 
     // 2. Transition GBuffer to RenderTarget
     std::vector<rhi::TextureBarrier> barriers;
@@ -481,7 +484,9 @@ void DeferredRenderer::execute_lighting_pass(
         static_cast<u32>(std::min(spot_lights.size(), static_cast<size_t>(kMaxDeferredSpotLights)));
     const auto light_ubo = make_deferred_light_ubo(sun_direction, sun_color, 1.0f,
                                                    point_light_count, spot_light_count);
-    m_light_ubo->upload(light_ubo);
+    if (m_light_ubo) {
+        m_light_ubo->upload(light_ubo);
+    }
 
     if (point_light_count > 0 && m_point_light_ssbo) {
         m_point_light_ssbo->upload(
@@ -874,8 +879,9 @@ void DeferredRenderer::update_gbuffer_descriptor_set() {
 void DeferredRenderer::create_fullscreen_quad() {
     float vertices[] = {
         // positions        // texture Coords
-        -1.0f, 1.0f, 0.0f, 0.0f, 1.0f, -1.0f, -1.0f, 0.0f, 0.0f, 0.0f,
-        1.0f,  1.0f, 0.0f, 1.0f, 1.0f, 1.0f,  -1.0f, 0.0f, 1.0f, 0.0f,
+        -1.0f, 1.0f,  0.0f, 0.0f, 1.0f, -1.0f, -1.0f, 0.0f, 0.0f, 0.0f,
+        1.0f,  -1.0f, 0.0f, 1.0f, 0.0f, -1.0f, 1.0f,  0.0f, 0.0f, 1.0f,
+        1.0f,  -1.0f, 0.0f, 1.0f, 0.0f, 1.0f,  1.0f,  0.0f, 1.0f, 1.0f,
     };
     m_quad_vb = m_device.create_vertex_buffer(
         std::span<const u8>(reinterpret_cast<const u8*>(vertices), sizeof(vertices)),
@@ -885,7 +891,7 @@ void DeferredRenderer::create_fullscreen_quad() {
 void DeferredRenderer::render_fullscreen_quad(rhi::CommandList& cmd) const {
     if (m_quad_vb) {
         cmd.bind_vertex_buffer(0, *m_quad_vb);
-        cmd.draw(4, 1, 0, 0);
+        cmd.draw(6, 1, 0, 0);
     }
 }
 
