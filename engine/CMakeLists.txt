@@ -58,6 +58,7 @@ set(ENGINE_SOURCES
     renderer/opengl/shader.cpp
     renderer/opengl/uniform_buffer.cpp
     renderer/deferred_renderer.cpp
+    renderer/deferred_render_data.cpp
     renderer/debug_renderer.cpp
     renderer/cinematic_camera.cpp
 
