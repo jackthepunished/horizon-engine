@@ -54,6 +54,11 @@ public:
      */
     [[nodiscard]] bool reload_texture(TextureHandle handle);
 
+    /**
+     * @brief Register an existing texture
+     */
+    [[nodiscard]] TextureHandle register_texture(Texture&& texture, const std::string& name);
+
     // ========================================================================
     // Model Management
     // ========================================================================
@@ -73,6 +78,11 @@ public:
      * @brief Reload a model from disk
      */
     [[nodiscard]] bool reload_model(ModelHandle handle);
+
+    /**
+     * @brief Register an existing model
+     */
+    [[nodiscard]] ModelHandle register_model(Model&& model, const std::string& name);
 
     // ========================================================================
     // Material Management

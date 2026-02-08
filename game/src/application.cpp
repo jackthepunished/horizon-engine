@@ -128,40 +128,57 @@ void Application::init_scene() {
 }
 
 void Application::load_assets() {
-    // 1. Create Meshes
-    m_plane_mesh = hz::Mesh::create_plane(50.0f, 10.0f); // 50x50 plane
-    m_plane_mesh->upload_to_gpu(*m_device, "PlaneMesh");
+    m_assets = std::make_unique<hz::AssetRegistry>();
 
-    m_sphere_mesh = hz::Mesh::create_sphere(1.0f, 64, 64);
-    m_sphere_mesh->upload_to_gpu(*m_device, "SphereMesh");
-
-    m_cube_mesh = hz::Mesh::create_cube(1.0f);
-    m_cube_mesh->upload_to_gpu(*m_device, "CubeMesh");
+    // 1. Create Meshes & Models
+    {
+        auto mesh = hz::Mesh::create_plane(50.0f, 10.0f);
+        mesh.upload_to_gpu(*m_device, "PlaneMesh");
+        hz::Model model;
+        model.add_mesh(std::move(mesh));
+        m_plane_handle = m_assets->register_model(std::move(model), "plane");
+    }
+    {
+        auto mesh = hz::Mesh::create_sphere(1.0f, 64, 64);
+        mesh.upload_to_gpu(*m_device, "SphereMesh");
+        hz::Model model;
+        model.add_mesh(std::move(mesh));
+        m_sphere_handle = m_assets->register_model(std::move(model), "sphere");
+    }
+    {
+        auto mesh = hz::Mesh::create_cube(1.0f);
+        mesh.upload_to_gpu(*m_device, "CubeMesh");
+        hz::Model model;
+        model.add_mesh(std::move(mesh));
+        m_cube_handle = m_assets->register_model(std::move(model), "cube");
+    }
 
     // 2. Load/Create Default Textures
-
     // Albedo (White)
     {
         hz::u8 data[4] = {200, 200, 200, 255};
-        m_albedo_tex.emplace();
-        m_albedo_tex->create(1, 1, hz::TextureFormat::RGBA8, data);
-        m_albedo_tex->upload_to_gpu(*m_device);
+        hz::Texture tex;
+        tex.create(1, 1, hz::TextureFormat::RGBA8, data);
+        tex.upload_to_gpu(*m_device);
+        m_albedo_handle = m_assets->register_texture(std::move(tex), "default_albedo");
     }
 
     // Normal (Flat Z+)
     {
         hz::u8 data[4] = {128, 128, 255, 255};
-        m_normal_tex.emplace();
-        m_normal_tex->create(1, 1, hz::TextureFormat::RGBA8, data);
-        m_normal_tex->upload_to_gpu(*m_device);
+        hz::Texture tex;
+        tex.create(1, 1, hz::TextureFormat::RGBA8, data);
+        tex.upload_to_gpu(*m_device);
+        m_normal_handle = m_assets->register_texture(std::move(tex), "default_normal");
     }
 
     // ARM (AO=1, Roughness=0.8, Metallic=0.0) -> Plastic-like
     {
         hz::u8 data[4] = {255, 204, 0, 255};
-        m_arm_tex.emplace();
-        m_arm_tex->create(1, 1, hz::TextureFormat::RGBA8, data);
-        m_arm_tex->upload_to_gpu(*m_device);
+        hz::Texture tex;
+        tex.create(1, 1, hz::TextureFormat::RGBA8, data);
+        tex.upload_to_gpu(*m_device);
+        m_arm_handle = m_assets->register_texture(std::move(tex), "default_arm");
     }
 
     // Initialize IBL
@@ -175,10 +192,15 @@ void Application::load_assets() {
     }
 
     // Create default material set
-    if (m_albedo_tex && m_normal_tex && m_arm_tex && m_albedo_tex->is_uploaded() &&
-        m_normal_tex->is_uploaded() && m_arm_tex->is_uploaded()) {
-        m_default_material_set = m_renderer->create_material_descriptor_set(
-            *m_albedo_tex->rhi_view(), *m_normal_tex->rhi_view(), *m_arm_tex->rhi_view());
+    if (m_albedo_handle.is_valid() && m_normal_handle.is_valid() && m_arm_handle.is_valid()) {
+        auto* albedo = m_assets->get_texture(m_albedo_handle);
+        auto* normal = m_assets->get_texture(m_normal_handle);
+        auto* arm = m_assets->get_texture(m_arm_handle);
+
+        if (albedo && normal && arm) {
+            m_default_material_set = m_renderer->create_material_descriptor_set(
+                *albedo->rhi_view(), *normal->rhi_view(), *arm->rhi_view());
+        }
     } else {
         HZ_ERROR("Failed to create default material descriptor set: Textures not ready");
     }
@@ -196,39 +218,43 @@ void Application::setup_scene_entities() {
     }
 
     // Ground Plane
-    if (m_plane_mesh) {
+    if (m_plane_handle.is_valid()) {
         auto plane = m_scene->create_entity();
         auto& tc = m_scene->registry().emplace<hz::TransformComponent>(plane);
         tc.position = glm::vec3(0.0f, -1.0f, 0.0f);
         tc.scale = glm::vec3(1.0f);
 
         auto& mc = m_scene->registry().emplace<hz::MeshComponent>(plane);
-        mc.mesh_render_ptr = &m_plane_mesh.value();
+        mc.mesh_type = hz::MeshComponent::MeshType::Model;
+        mc.model = m_plane_handle;
         mc.metallic = 0.1f;
         mc.roughness = 0.8f;
+        mc.albedo_color = glm::vec3(0.8f);
     }
 
     // Test Cube
-    if (m_cube_mesh) {
+    if (m_cube_handle.is_valid()) {
         auto cube = m_scene->create_entity();
         auto& tc = m_scene->registry().emplace<hz::TransformComponent>(cube);
         tc.position = glm::vec3(-2.0f, 1.0f, 0.0f);
 
         auto& mc = m_scene->registry().emplace<hz::MeshComponent>(cube);
-        mc.mesh_render_ptr = &m_cube_mesh.value();
+        mc.mesh_type = hz::MeshComponent::MeshType::Model;
+        mc.model = m_cube_handle;
         mc.albedo_color = glm::vec3(1.0f, 0.2f, 0.2f); // Reddish
         mc.metallic = 0.9f;
         mc.roughness = 0.1f;
     }
 
     // Test Sphere
-    if (m_sphere_mesh) {
+    if (m_sphere_handle.is_valid()) {
         auto sphere = m_scene->create_entity();
         auto& tc = m_scene->registry().emplace<hz::TransformComponent>(sphere);
         tc.position = glm::vec3(2.0f, 1.0f, 0.0f);
 
         auto& mc = m_scene->registry().emplace<hz::MeshComponent>(sphere);
-        mc.mesh_render_ptr = &m_sphere_mesh.value();
+        mc.mesh_type = hz::MeshComponent::MeshType::Model;
+        mc.model = m_sphere_handle;
         mc.albedo_color = glm::vec3(0.2f, 1.0f, 0.2f); // Greenish
         mc.metallic = 0.0f;
         mc.roughness = 0.2f;
@@ -353,7 +379,24 @@ void Application::on_render([[maybe_unused]] float alpha) {
         for (auto entity : group) {
             auto [tc, mc] = group.get<hz::TransformComponent, hz::MeshComponent>(entity);
 
+            const hz::Mesh* mesh_to_draw = nullptr;
+
+            // 1. Runtime pointer (bypass)
             if (mc.mesh_render_ptr && mc.mesh_render_ptr->is_uploaded()) {
+                mesh_to_draw = mc.mesh_render_ptr;
+            }
+            // 2. Model Handle
+            else if (mc.model.is_valid()) {
+                auto* model = m_assets->get_model(mc.model);
+                if (model && model->mesh_count() > 0) {
+                    const auto& meshes = model->meshes();
+                    if (!meshes.empty() && meshes[0].is_uploaded()) {
+                        mesh_to_draw = &meshes[0];
+                    }
+                }
+            }
+
+            if (mesh_to_draw) {
                 // Push Model Matrix (Vertex Stage, Offset 0)
                 glm::mat4 model = tc.get_transform();
                 cmd->push_constants(*m_renderer->get_geometry_layout(),
@@ -373,7 +416,7 @@ void Application::on_render([[maybe_unused]] float alpha) {
                                     hz::rhi::ShaderStage::Fragment, mat_params, 64);
 
                 // Draw
-                mc.mesh_render_ptr->draw(*cmd);
+                mesh_to_draw->draw(*cmd);
             }
         }
     }

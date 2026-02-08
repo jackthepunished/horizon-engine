@@ -64,6 +64,27 @@ bool AssetRegistry::reload_texture(TextureHandle handle) {
     return true;
 }
 
+TextureHandle AssetRegistry::register_texture(Texture&& texture, const std::string& name) {
+    if (!texture.is_valid()) {
+        return TextureHandle::invalid();
+    }
+
+    auto it = m_texture_path_to_index.find(name);
+    if (it != m_texture_path_to_index.end()) {
+        HZ_ENGINE_WARN("Texture with name '{}' already exists, overwriting", name);
+        auto& slot = m_textures[it->second];
+        slot.asset = std::move(texture);
+        slot.generation++;
+        return {it->second, slot.generation};
+    }
+
+    u32 index = static_cast<u32>(m_textures.size());
+    m_textures.push_back({std::move(texture), 1, name});
+    m_texture_path_to_index[name] = index;
+
+    return {index, 1};
+}
+
 // ============================================================================
 // Model Management
 // ============================================================================
@@ -137,6 +158,27 @@ bool AssetRegistry::reload_model(ModelHandle handle) {
     slot.generation++;
     HZ_ENGINE_INFO("Reloaded model: {}", slot.path);
     return true;
+}
+
+ModelHandle AssetRegistry::register_model(Model&& model, const std::string& name) {
+    if (!model.is_valid()) {
+        return ModelHandle::invalid();
+    }
+
+    auto it = m_model_path_to_index.find(name);
+    if (it != m_model_path_to_index.end()) {
+        HZ_ENGINE_WARN("Model with name '{}' already exists, overwriting", name);
+        auto& slot = m_models[it->second];
+        slot.asset = std::move(model);
+        slot.generation++;
+        return {it->second, slot.generation};
+    }
+
+    u32 index = static_cast<u32>(m_models.size());
+    m_models.push_back({std::move(model), 1, name});
+    m_model_path_to_index[name] = index;
+
+    return {index, 1};
 }
 
 // ============================================================================

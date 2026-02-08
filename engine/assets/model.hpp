@@ -65,6 +65,11 @@ public:
     [[nodiscard]] static Model load_from_fbx(std::string_view path);
 
     /**
+     * @brief Add a mesh to the model
+     */
+    void add_mesh(Mesh&& mesh) { m_meshes.push_back(std::move(mesh)); }
+
+    /**
      * @brief Draw all meshes
      */
     void draw() const;
@@ -116,6 +121,11 @@ public:
      * @brief Get mesh count
      */
     [[nodiscard]] size_t mesh_count() const noexcept { return m_meshes.size(); }
+
+    /**
+     * @brief Get meshes
+     */
+    [[nodiscard]] const std::vector<Mesh>& meshes() const { return m_meshes; }
 
     /**
      * @brief Get file path

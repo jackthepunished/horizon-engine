@@ -16,6 +16,7 @@
 #include <memory>
 #include <optional>
 
+#include <engine/assets/asset_registry.hpp>
 #include <engine/assets/model.hpp>
 #include <engine/assets/texture.hpp>
 #include <engine/audio/audio_engine.hpp>
@@ -80,6 +81,7 @@ private:
     std::unique_ptr<hz::Scene> m_scene;
     std::unique_ptr<hz::PhysicsWorld> m_physics;
     std::unique_ptr<hz::DebugRenderer> m_debug_renderer;
+    std::unique_ptr<hz::AssetRegistry> m_assets;
     std::unique_ptr<hz::IBL> m_ibl;
 
     // Game systems
@@ -89,17 +91,14 @@ private:
     CharacterSystem m_character_system;
     LifetimeSystem m_lifetime_system;
 
-    // Models & Meshes (optional because they are created during init)
-    std::optional<hz::Mesh> m_plane_mesh;
-    std::optional<hz::Mesh> m_sphere_mesh;
-    std::optional<hz::Mesh> m_cube_mesh;
-    std::optional<hz::Model> m_test_model;      // Treasure chest
-    std::optional<hz::Model> m_character_model; // Character
+    // Asset Handles
+    hz::ModelHandle m_plane_handle;
+    hz::ModelHandle m_sphere_handle;
+    hz::ModelHandle m_cube_handle;
 
-    // Textures (optional)
-    std::optional<hz::Texture> m_albedo_tex;
-    std::optional<hz::Texture> m_normal_tex;
-    std::optional<hz::Texture> m_arm_tex;
+    hz::TextureHandle m_albedo_handle;
+    hz::TextureHandle m_normal_handle;
+    hz::TextureHandle m_arm_handle;
 
     // IBL textures
     hz::rhi::TextureView* m_irradiance_map{nullptr};
