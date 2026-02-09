@@ -2,23 +2,31 @@
 
 ## Prerequisites
 
-Horizon Engine targets **C++20** and strictly adheres to modern standards.
+Horizon Engine targets **C++20** and uses **Vulkan 1.3** for rendering.
 
 ### Windows
 
-- **Compiler**: MSVC 2022 (v143) or Clang-CL 14+
-- **Tools**: CMake 3.21+, Ninja
+- **Compiler**: MSVC 2022 (v143) or Clang-CL 16+
+- **Tools**: CMake 3.25+, Ninja
+- **SDK**: [Vulkan SDK 1.3.268+](https://vulkan.lunarg.com/)
 
 ### macOS
 
-- **Compiler**: Apple Clang 14+ (Xcode 14+)
-- **Tools**: CMake 3.21+, Ninja
+> **Note**: macOS support via MoltenVK is currently experimental.
+
+- **Compiler**: Apple Clang 15+ (Xcode 15+)
+- **Tools**: CMake 3.25+, Ninja
+- **SDK**: [Vulkan SDK 1.3.268+](https://vulkan.lunarg.com/) (includes MoltenVK)
 
 ### Linux
 
-- **Compiler**: GCC 11+ or Clang 14+
-- **Tools**: CMake 3.21+, Ninja, Make
-- **Packages**: `libx11-dev`, `libwayland-dev`, `libxkbcommon-dev`, `libxcursor-dev`, `libxinerama-dev`, `libxrandr-dev`, `libxi-dev`
+- **Compiler**: GCC 13+ or Clang 16+
+- **Tools**: CMake 3.25+, Ninja
+- **SDK**: [Vulkan SDK 1.3.268+](https://vulkan.lunarg.com/)
+- **Packages**:
+  - `libwayland-dev`, `libxkbcommon-dev` (Wayland)
+  - `libx11-dev`, `libxrandr-dev`, `libxi-dev` (X11)
+  - `libvulkan-dev`, `vulkan-tools`
 
 ---
 
@@ -51,7 +59,8 @@ We recommend using **Ninja** for the fastest build times.
    ```
 
 ---
-VK_STRUCTURE_T# Build Options
+
+## Build Options
 
 | Option | Default | Description |
 |--------|---------|-------------|
@@ -68,11 +77,13 @@ cmake -B build -DCMAKE_BUILD_TYPE=Release -DHZ_BUILD_TESTS=ON -DWERROR=ON -GNinj
 
 ## Troubleshooting
 
+### "Vulkan SDK not found"
+
+Ensure the `VULKAN_SDK` environment variable is set. On Windows, the installer usually does this. On Linux/macOS, source the setup script:
+```bash
+source ~/VulkanSDK/1.3.xx.x/setup-env.sh
+```
+
 ### "C++20 not supported"
 
-Ensure you are not using an old compiler. Check `g++ --version` or `clang++ --version`.
-
-### "OpenGL context creation failed"
-
-- **macOS**: Ensure you have a display available. For headless builds, use `-DHZ_HEADLESS=ON`.
-- **Linux**: Install Mesa or proprietary GPU drivers.
+Ensure you are using a modern compiler. Check `g++ --version` or `clang++ --version`.

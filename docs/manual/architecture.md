@@ -35,31 +35,29 @@ graph TD
 
 ## Core Principles
 
-### 1. RAII Everywhere
+### 1. RHI Abstraction
 
-All OpenGL objects are managed through move-only RAII wrappers:
+The engine uses a **Render Hardware Interface (RHI)** to abstract the graphics API (Vulkan). All GPU resources are managed through RAII-compliant handle wrappers:
 
 ```cpp
-class Shader {
-    GLuint m_id{0};
-public:
-    ~Shader() {
-        if (m_id) glDeleteProgram(m_id);
-    }
-    Shader(Shader&&) noexcept = default;
-    Shader(const Shader&) = delete;
-};
+// Example: Creating a texture via RHI
+auto texture = device.create_texture({
+    .width = 1920,
+    .height = 1080,
+    .format = TextureFormat::RGBA8_UNORM,
+    .usage = TextureUsage::Sampled | TextureUsage::Storage
+});
 ```
 
 ### 2. PMR Memory Model
 
-All engine containers use `std::pmr`:
+All engine containers use `std::pmr` for custom allocation strategies:
 
 | Domain   | Allocator   | Lifetime          |
 | -------- | ----------- | ----------------- |
 | Frame    | LinearArena | Single frame      |
 | ECS      | Pool        | Entity lifetime   |
-| Renderer | Pool        | Resource lifetime |
+| Command  | Pool        | CommandList scope |
 | Assets   | General     | Until unloaded    |
 
 ### 3. Pure ECS

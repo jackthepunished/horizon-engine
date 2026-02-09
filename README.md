@@ -1,78 +1,71 @@
 # Horizon Engine
 
 [![C++20](https://img.shields.io/badge/C++-20-blue.svg)](https://isocpp.org/)
-[![OpenGL](https://img.shields.io/badge/OpenGL-4.1-green.svg)](https://www.opengl.org/)
+[![Vulkan](https://img.shields.io/badge/Vulkan-1.3-red.svg)](https://www.khronos.org/vulkan/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/Tests-7%20passing-brightgreen.svg)](#testing)
+[![Tests](https://img.shields.io/badge/Tests-Passing-brightgreen.svg)](#testing)
 
-A modern **C++20 game engine** built for FPS games, featuring an Entity-Component-System architecture, PBR rendering pipeline, and action-based input system.
+A modern **C++20 game engine** built for high-performance graphics and gameplay, featuring a **Vulkan Deferred Renderer**, Entity-Component-System architecture, and Jolt Physics.
 
-I'm learning OpenGL, so this is a work in progress. Planning to migrate (or from zero)to Vulkan in the future.
-I'm using this project to learn and experiment with new technologies.
-Strictly keeping up with learnopengl.com
+I'm building this engine to learn and experiment with modern rendering architecture (Vulkan, Render Graphs, GPU-driven rendering) and engine design patterns.
 
-Note: Since I only have M4 Mac Mini, only the OpenGL 4.1 version is supported which is very old. But this situation helps me to understand the inner workings of the graphics pipelines and the depths of the OpenGL, and forces me to write better code (which I'm not there yet.)
+> **Note**: This project is currently in active development. The renderer has been recently migrated from OpenGL to **Vulkan**.
 
-### News (2026-01-11)
+### News (2026-02-10)
 
-**⟳ Migrated to EnTT**: Switched the internal ECS from a custom implementation to [EnTT](https://github.com/skypjack/entt).
-
-> _Why?_ Our custom linear-memory ECS was educational, but EnTT provides a battle-tested sparse set implementation, significantly better performance, and standard C++ iterator support, allowing us to focus on gameplay logic rather than maintaining low-level architecture.
+**⟳ Vulkan Deferred Renderer**: The rendering backend has been completely rewritten using Vulkan 1.3. It now features a state-of-the-art Deferred Rendering pipeline with G-Buffer, Cascaded Shadow Maps, and TAA.
 
 ## Features
 
 ### Core Systems
 
-- **Entity-Component-System (ECS)** - Powered by [EnTT](https://github.com/skypjack/entt) for maximum performance
-- **Physics Integration** - Rigid body dynamics using Jolt Physics
-- **Audio System** - 3D spatial audio using miniaudio
-- **Action-Based Input** - Abstract input mapping for keyboard, mouse, and gamepad
-- **Fixed-Timestep Game Loop** - Deterministic physics at 60 Hz
-- **Memory Arena Allocator** - Efficient memory management with `std::pmr`
+- **Entity-Component-System (ECS)** - Powered by [EnTT](https://github.com/skypjack/entt) for maximum performance and flexibility.
+- **Physics Integration** - Rigid body dynamics and character controllers using [Jolt Physics](https://github.com/jrouwe/JoltPhysics).
+- **Audio System** - 3D spatial audio using miniaudio.
+- **Action-Based Input** - Abstract input mapping for keyboard, mouse, and gamepad.
+- **Memory Management** - Custom memory arenas and allocators.
 
-### Rendering
+### Rendering (Vulkan)
 
-- **OpenGL 4.1 PBR Renderer** - Cross-platform graphics (macOS, Windows, Linux)
-- **Shader Preprocessor** - Runtime `#include` support for modular GLSL
-- **Common GLSL Library** - Reusable lighting and math functions
-- **Vegetation Rendering** - 3D grass with wind animation and billboarding
-- **Material System** - First-class PBR materials with texture handles
-- **GLTF Model Loading** - Full 3D model support via tinygltf
-- **HDR Pipeline** - Bloom, tone mapping, exposure control
-- **SSAO** - Screen-space ambient occlusion
-- **Shadow Mapping** - Directional light shadows
-- **HDRI Skybox** - Equirectangular environment maps
+- **Deferred Rendering Pipeline** - Optimized G-Buffer layout (Albedo, Normal, ARM, Emission, Velocity).
+- **Vulkan RHI** - Modern Render Hardware Interface abstracting Vulkan complexity.
+- **PBR Lighting** - Physically Based Rendering with image-based lighting (IBL).
+- **Shadows** - Cascaded Shadow Maps (CSM) with PCF filtering.
+- **Global Illumination** - (Planned) Ray-traced or probe-based GI.
+- **Post-Processing**
+  - **TAA** - Temporal Anti-Aliasing with jittering.
+  - **SSR** - Screen-Space Reflections.
+  - **SSAO** - Screen-Space Ambient Occlusion.
+  - **Bloom** - High-quality bloom with downsampling/upsampling.
+  - **Tonemapping** - ACES / Filmic tonemapping.
+- **Asset Pipeline** - Asynchronous asset loading and processing (glTF models, KTX textures).
 
-### Tools & Editor
+### Tools
 
-- **Scene Serialization** - JSON-based scene save/load (F5/F6)
-- **In-Game Editor** - Entity hierarchy, material inspector, scene settings
-- **Debug Overlay** - FPS, frame time, entity count (F3)
-- **ImGui Interface** - Full debug tooling
-
-### Asset Management
-
-- **Handle-Based Registry** - Textures, Models, Materials, Sounds
-- **Automatic Caching** - Prevents duplicate asset loads
-- **Hot Reload Ready** - Asset reloading infrastructure
+- **ImGui Editor** - In-game editor for scene manipulation, entity inspection, and performance profiling.
+- **Scene Serialization** - JSON-based scene saving/loading.
+- **Hot Reloading** - Shader re-compilation and asset reloading at runtime.
 
 ## Quick Start
 
 ### Prerequisites
 
-- CMake 3.21+
-- C++20 compiler (Clang 14+, GCC 11+, MSVC 2022+)
-- Git
+- **CMake 3.25+**
+- **C++20 Compiler** (MSVC 2022, Clang 16+, GCC 13+)
+- **Vulkan SDK 1.3+**
+- **Git**
 
 ### Build
 
 ```bash
-# Clone
+# Clone the repository
 git clone https://github.com/jackthepunished/horizon-engine.git
 cd horizon-engine
 
-# Configure & Build
+# Configure
 cmake -B build -DCMAKE_BUILD_TYPE=Release
+
+# Build
 cmake --build build --parallel
 
 # Run
@@ -86,82 +79,62 @@ cmake --build build --parallel
 | `W/A/S/D` | Move          |
 | `Mouse`   | Look around   |
 | `Shift`   | Sprint        |
-| `Space`   | Jump/Up       |
-| `Ctrl`    | Crouch/Down   |
-| `Tab`     | Toggle cursor |
-| `F3`      | Debug overlay |
-| `F5`      | Save scene    |
-| `F6`      | Load scene    |
-| `Esc`     | Quit/Menu     |
+| `Space`   | Jump          |
+| `Ctrl`    | Crouch        |
+| `Tab`     | Toggle Cursor |
+| `F3`      | Debug Stats   |
+| `F1`      | Toggle Editor |
 
 ## Architecture
 
 ```
 horizon-engine/
 ├── engine/               # Core engine library
-│   ├── assets/           # Textures, Models, Materials, Cubemaps
-│   ├── audio/            # Spatial audio system
-│   ├── core/             # Logging, memory, game loop
-│   ├── ecs/              # Entity-Component-System
+│   ├── core/             # Logging, memory, events
+│   ├── ecs/              # Entity-Component-System registry
+│   ├── rhi/              # Render Hardware Interface (Vulkan)
+│   ├── renderer/         # Deferred renderer, passes, graphs
 │   ├── physics/          # Jolt Physics integration
-│   ├── platform/         # Window, input abstraction
-│   ├── renderer/         # OpenGL renderer, shaders, framebuffers
-│   ├── scene/            # Components, serialization
-│   └── ui/               # ImGui integration
-├── game/                 # Sample FPS game
-│   └── src/              # Main loop, editor UI
-├── assets/               # Shaders, textures, models
-├── tests/                # Unit tests (Catch2)
-└── third_party/          # External dependencies
+│   ├── audio/            # Audio system
+│   ├── assets/           # Asset manager (Models, Textures, Shaders)
+│   ├── scene/            # Scene graph and serialization
+│   └── platform/         # OS abstraction (Window, Input)
+├── game/                 # Sample Game Application
+├── assets/               # Runtime assets (Shaders, Models)
+└── tests/                # Unit tests
 ```
 
 ## Dependencies
 
-All dependencies are fetched automatically via CMake FetchContent:
-
-| Library                                           | Version | Purpose            |
-| ------------------------------------------------- | ------- | ------------------ |
-| [GLFW](https://www.glfw.org/)                     | 3.4     | Windowing & Input  |
-| [GLM](https://github.com/g-truc/glm)              | 1.0.1   | Math Library       |
-| [spdlog](https://github.com/gabime/spdlog)        | 1.14.1  | Logging            |
-| [Catch2](https://github.com/catchorg/Catch2)      | 3.5.2   | Testing            |
-| [Jolt](https://github.com/jrouwe/JoltPhysics)     | 5.0.0   | Physics Engine     |
-| [miniaudio](https://miniaud.io/)                  | 0.11.21 | Audio Engine       |
-| [Dear ImGui](https://github.com/ocornut/imgui)    | 1.90.4  | UI Library         |
-| [stb_image](https://github.com/nothings/stb)      | master  | Image Loading      |
-| [tinyobjloader](https://github.com/tinyobjloader) | 2.0.0   | OBJ Model Loading  |
-| [tinygltf](https://github.com/syoyo/tinygltf)     | 2.8.x   | GLTF Model Loading |
-| [nlohmann/json](https://github.com/nlohmann/json) | 3.11.x  | JSON Parsing       |
-
-## Testing
-
-```bash
-cd build && ctest --output-on-failure
-```
-
-```
-100% tests passed, 0 tests failed out of 7
-```
+| Library                                           | Purpose            |
+| ------------------------------------------------- | ------------------ |
+| [Vulkan](https://www.vulkan.org/)                 | Graphics API       |
+| [GLFW](https://www.glfw.org/)                     | Windowing & Input  |
+| [GLM](https://github.com/g-truc/glm)              | Math Library       |
+| [EnTT](https://github.com/skypjack/entt)          | ECS                |
+| [Jolt Physics](https://github.com/jrouwe/JoltPhysics) | Physics        |
+| [spdlog](https://github.com/gabime/spdlog)        | Logging            |
+| [miniaudio](https://miniaud.io/)                  | Audio              |
+| [Dear ImGui](https://github.com/ocornut/imgui)    | UI & Debugging     |
+| [tinygltf](https://github.com/syoyo/tinygltf)     | Model Loading      |
+| [Catch2](https://github.com/catchorg/Catch2)      | Testing            |
 
 ## Roadmap
 
-- [x] **Milestone 0**: Repository & Build System
-- [x] **Milestone 1**: Core Systems (ECS, Input, Game Loop)
-- [x] **Milestone 2**: OpenGL Rendering (Shaders, Meshes, Camera)
-- [x] **Milestone 3**: Assets & Hot Reload
-- [x] **Milestone 4**: Physics (Jolt Integration)
-- [x] **Milestone 5**: Audio, AI, UI (Dear ImGui)
-- [x] **Milestone 6**: PBR Rendering, Materials, GLTF Loading
-- [ ] **Milestone 7**: Skeletal Animation & Advanced Lighting
-  - Bone hierarchy & animation clips
-  - GPU skinning
-  - IBL (irradiance, prefiltered environment maps)
-  - Cascaded Shadow Maps
-- [ ] **Milestone 8**: Render Architecture & Optimization
-  - Render pass system (Geometry, Shadow, Lighting, Post)
-  - Frustum culling & instanced rendering
-  - GLTF material extraction
-- [ ] **Milestone 9**: Networking & Multiplayer _(optional)_
+- [x] **Core**: ECS, Windowing, Input, Logging
+- [x] **Physics**: Jolt Integration, Character Controller
+- [x] **RHI**: Vulkan Backend (Device, Swapchain, Pipelines, Descriptors)
+- [x] **Renderer**: Deferred Pipeline, G-Buffer, PBR
+- [x] **Lighting**: Point/Spot/Dir Lights, Cascaded Shadow Maps
+- [x] **Post-Process**: Bloom, Tonemapping, TAA, SSR
+- [ ] **Advanced Rendering**:
+    - GPU-Driven Rendering (Mesh Shaders, Multi-Draw)
+    - Ray Tracing (Shadows, Reflections)
+    - Volumetric Fog
+- [ ] **Editor**:
+    - Gizmos
+    - Asset Browser
+    - Scene Graph Hierarchy
 
 ## License
 

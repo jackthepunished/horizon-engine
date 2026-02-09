@@ -28,14 +28,18 @@ Zero-allocation runtime using `std::pmr` polymorphic allocators.
 
 ## Graphics & Rendering
 
-Our renderer is built on **OpenGL 4.1 Core Profile** (macOS compatible).
+Our renderer is built on **Vulkan 1.3** with a modern Deferred Rendering pipeline.
 
-- **Deferred Rendering**: G-Buffer based rendering pipeline with PBR materials.
+- **Deferred Rendering**: High-performance G-Buffer pipeline optimized for complex scenes with many lights.
 - **Physically Based Rendering (PBR)**: Cook-Torrance BRDF with metallic-roughness workflow.
 - **Image-Based Lighting (IBL)**: HDR environment maps with irradiance and prefiltered convolution.
-- **Cascaded Shadow Maps (CSM)**: High-quality directional shadows.
-- **Screen-Space Ambient Occlusion (SSAO)**: Real-time ambient occlusion.
-- **Temporal Anti-Aliasing (TAA)**: Smooth edges with temporal accumulation.
+- **Cascaded Shadow Maps (CSM)**: High-quality directional shadows with 4 cascades.
+- **Post-Processing Stack**:
+  - **SSAO**: Screen-Space Ambient Occlusion.
+  - **TAA**: Temporal Anti-Aliasing with history re-projection.
+  - **SSR**: Screen-Space Reflections.
+  - **Bloom**: Energy-conserving bloom.
+  - **Tonemapping**: ACES for cinematic color.
 - **ImGui Integration**: Immediate mode GUI for engine tools and debug overlays.
 
 ---
