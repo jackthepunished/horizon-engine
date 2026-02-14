@@ -35,8 +35,10 @@ option(HZ_HEADLESS "Build in headless mode (no GPU/window)" OFF)
 
 option(WERROR "Treat warnings as errors" OFF)
 
+# Store strict warning flags in a variable so they only apply to our targets,
+# NOT to third-party dependencies (shaderc, glslang, etc.)
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
-    add_compile_options(
+    set(HZ_WARNING_FLAGS
         -Wall -Wextra -Wpedantic
         -Wno-unused-parameter
         -Wconversion
@@ -44,7 +46,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
         -Wnon-virtual-dtor
     )
     if(WERROR)
-        add_compile_options(-Werror)
+        list(APPEND HZ_WARNING_FLAGS -Werror)
     endif()
 
     if(CMAKE_BUILD_TYPE STREQUAL "Debug")
@@ -55,9 +57,9 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
         add_compile_definitions(HZ_RELEASE=1)
     endif()
 elseif(MSVC)
-    add_compile_options(/W4 /permissive-)
+    set(HZ_WARNING_FLAGS /W4 /permissive-)
     if(WERROR)
-        add_compile_options(/WX)
+        list(APPEND HZ_WARNING_FLAGS /WX)
     endif()
 
     if(CMAKE_BUILD_TYPE STREQUAL "Debug")

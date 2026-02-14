@@ -61,6 +61,7 @@ set(ENGINE_SOURCES
     renderer/deferred_render_data.cpp
     renderer/debug_renderer.cpp
     renderer/cinematic_camera.cpp
+    renderer/gpu_scene.cpp
 
     # Audio
     audio/audio_engine.cpp
@@ -211,3 +212,7 @@ target_compile_definitions(horizon_engine
         $<$<BOOL:${HZ_HEADLESS}>:HZ_HEADLESS=1>
         $<$<BOOL:${HZ_HAS_VULKAN}>:HZ_VULKAN_BACKEND=1>
 )
+
+# Apply strict warning flags only to our engine code, not third-party deps
+target_compile_options(horizon_engine PRIVATE ${HZ_WARNING_FLAGS})
+

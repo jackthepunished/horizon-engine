@@ -508,4 +508,39 @@ void Application::shutdown() {
     hz::Log::shutdown();
 }
 
+const hz::Mesh* Application::resolve_mesh(const hz::MeshComponent& mc) {
+    // Use cached pointer if available
+    if (mc.mesh_render_ptr) {
+        return mc.mesh_render_ptr;
+    }
+
+    hz::ModelHandle handle;
+
+    if (mc.mesh_type == hz::MeshComponent::MeshType::Model) {
+        handle = mc.model;
+    } else {
+        // Primitive: map name to the pre-registered model handle
+        const std::string& name = mc.primitive_name.empty() ? mc.mesh_path : mc.primitive_name;
+        if (name == "cube") {
+            handle = m_cube_handle;
+        } else if (name == "sphere") {
+            handle = m_sphere_handle;
+        } else if (name == "plane") {
+            handle = m_plane_handle;
+        }
+    }
+
+    if (!handle.is_valid()) {
+        return nullptr;
+    }
+
+    if (auto* model = m_assets->get_model(handle)) {
+        if (!model->meshes().empty()) {
+            return &model->meshes()[0];
+        }
+    }
+
+    return nullptr;
+}
+
 } // namespace game

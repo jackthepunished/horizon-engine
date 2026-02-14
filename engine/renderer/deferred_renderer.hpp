@@ -23,6 +23,7 @@
 
 #include "engine/core/types.hpp"
 #include "engine/renderer/camera.hpp"
+#include "engine/renderer/gpu_scene.hpp"
 #include "engine/rhi/rhi_command_list.hpp"
 #include "engine/rhi/rhi_device.hpp"
 #include "engine/rhi/rhi_pipeline.hpp"
@@ -122,12 +123,13 @@ struct CascadedShadowMap {
 
     void create(rhi::Device& device, const CascadedShadowConfig& cfg);
     void destroy();
-    void update_cascades(const Camera& camera, const glm::vec3& light_dir);
+    void update_cascades(const Camera& camera, const glm::vec3& light_dir, f32 aspect_ratio);
 
 private:
     void calculate_cascade_splits(const Camera& camera);
     [[nodiscard]] glm::mat4 calculate_light_space_matrix(u32 cascade, const Camera& camera,
-                                                         const glm::vec3& light_dir);
+                                                         const glm::vec3& light_dir,
+                                                         f32 aspect_ratio);
 };
 
 // ============================================================================
@@ -456,6 +458,18 @@ private:
     RenderStats m_stats;
 
     bool m_initialized{false};
+
+    // =========================================================================
+    // GPU-Driven Rendering
+    // =========================================================================
+
+    std::unique_ptr<GPUScene> m_gpu_scene;
+    std::unique_ptr<rhi::Pipeline> m_cull_pipeline;
+    std::unique_ptr<rhi::PipelineLayout> m_cull_layout;
+    std::unique_ptr<rhi::DescriptorSetLayout> m_cull_descriptor_layout;
+    std::unique_ptr<rhi::DescriptorSet> m_cull_descriptor_set;
+
+    bool m_gpu_driven_enabled{true};
 };
 
 // ============================================================================

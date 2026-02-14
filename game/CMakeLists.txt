@@ -22,3 +22,6 @@ target_include_directories(horizon_game
     PRIVATE
         ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
+
+# Apply strict warning flags to our game code
+target_compile_options(horizon_game PRIVATE ${HZ_WARNING_FLAGS})

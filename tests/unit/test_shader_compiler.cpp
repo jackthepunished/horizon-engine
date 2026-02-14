@@ -7,7 +7,6 @@
 
 #include <catch2/catch_test_macros.hpp>
 
-
 using namespace hz;
 
 // Simple vertex shader for testing
@@ -123,8 +122,9 @@ TEST_CASE("ShaderCompiler infers stage from extension", "[shader]") {
     REQUIRE(ShaderCompiler::infer_stage_from_extension("test.frag") == Stage::Fragment);
     REQUIRE(ShaderCompiler::infer_stage_from_extension("test.comp") == Stage::Compute);
     REQUIRE(ShaderCompiler::infer_stage_from_extension("test.geom") == Stage::Geometry);
-    REQUIRE(ShaderCompiler::infer_stage_from_extension("test.tesc") == Stage::TessControl);
-    REQUIRE(ShaderCompiler::infer_stage_from_extension("test.tese") == Stage::TessEval);
+    REQUIRE(ShaderCompiler::infer_stage_from_extension("test.tesc") == Stage::TessellationControl);
+    REQUIRE(ShaderCompiler::infer_stage_from_extension("test.tese") ==
+            Stage::TessellationEvaluation);
     REQUIRE(ShaderCompiler::infer_stage_from_extension("test.unknown") == Stage::None);
 }
 

@@ -126,9 +126,9 @@ private:
         return shaderc_fragment_shader;
     case Geometry:
         return shaderc_geometry_shader;
-    case TessControl:
+    case TessellationControl:
         return shaderc_tess_control_shader;
-    case TessEval:
+    case TessellationEvaluation:
         return shaderc_tess_evaluation_shader;
     case Compute:
         return shaderc_compute_shader;
@@ -294,10 +294,10 @@ rhi::ShaderStage ShaderCompiler::infer_stage_from_extension(const std::filesyste
         return rhi::ShaderStage::Geometry;
     }
     if (ext == ".tesc" || ext == ".tcs") {
-        return rhi::ShaderStage::TessControl;
+        return rhi::ShaderStage::TessellationControl;
     }
     if (ext == ".tese" || ext == ".tes") {
-        return rhi::ShaderStage::TessEval;
+        return rhi::ShaderStage::TessellationEvaluation;
     }
     if (ext == ".comp" || ext == ".cs" || ext == ".csh") {
         return rhi::ShaderStage::Compute;

@@ -4,6 +4,7 @@
 #include "engine/core/log.hpp"
 #include "engine/renderer/deferred_render_data.hpp"
 
+#include <cfloat>
 #include <cmath>
 #include <fstream>
 #include <sstream>
@@ -117,10 +118,12 @@ void CascadedShadowMap::destroy() {
         f.reset();
 }
 
-void CascadedShadowMap::update_cascades(const Camera& camera, const glm::vec3& light_dir) {
+void CascadedShadowMap::update_cascades(const Camera& camera, const glm::vec3& light_dir,
+                                        f32 aspect_ratio) {
     calculate_cascade_splits(camera);
     for (u32 i = 0; i < config.cascade_count; ++i) {
-        cascades[i].view_projection = calculate_light_space_matrix(i, camera, light_dir);
+        cascades[i].view_projection =
+            calculate_light_space_matrix(i, camera, light_dir, aspect_ratio);
     }
 }
 
@@ -145,15 +148,98 @@ void CascadedShadowMap::calculate_cascade_splits(const Camera& camera) {
         float log = min_z * std::pow(ratio, p);
         float uniform = min_z + range * p;
         float d = config.split_lambda * (log - uniform) + uniform;
-        cascades[i].split_depth = (d - near_clip) / clip_range;
+        cascades[i].split_depth = d;
     }
 }
 
 glm::mat4 CascadedShadowMap::calculate_light_space_matrix(u32 cascade, const Camera& camera,
-                                                          const glm::vec3& light_dir) {
-    // Simplified implementation for brevity
-    // In real implementation, this would compute tighter bounds based on cascade frustum
-    return glm::mat4(1.0f);
+                                                          const glm::vec3& light_dir,
+                                                          f32 aspect_ratio) {
+    float near_clip = camera.near_plane;
+    float far_clip = camera.far_plane;
+    if (far_clip > config.shadow_distance) {
+        far_clip = config.shadow_distance;
+    }
+
+    float prev_split_dist = cascade == 0 ? near_clip : cascades[cascade - 1].split_depth;
+    float split_dist = cascades[cascade].split_depth;
+
+    float tan_half_fov = std::tan(glm::radians(camera.fov * 0.5f));
+    float near_height = tan_half_fov * prev_split_dist;
+    float near_width = near_height * aspect_ratio;
+    float far_height = tan_half_fov * split_dist;
+    float far_width = far_height * aspect_ratio;
+
+    const glm::vec3 cam_pos = camera.position();
+    const glm::vec3 cam_forward = glm::normalize(camera.front());
+    const glm::vec3 cam_right = glm::normalize(camera.right());
+    const glm::vec3 cam_up = glm::normalize(glm::cross(cam_right, cam_forward));
+
+    glm::vec3 near_center = cam_pos + cam_forward * prev_split_dist;
+    glm::vec3 far_center = cam_pos + cam_forward * split_dist;
+
+    std::array<glm::vec3, 8> frustum_corners = {
+        near_center + cam_up * near_height - cam_right * near_width,
+        near_center + cam_up * near_height + cam_right * near_width,
+        near_center - cam_up * near_height - cam_right * near_width,
+        near_center - cam_up * near_height + cam_right * near_width,
+        far_center + cam_up * far_height - cam_right * far_width,
+        far_center + cam_up * far_height + cam_right * far_width,
+        far_center - cam_up * far_height - cam_right * far_width,
+        far_center - cam_up * far_height + cam_right * far_width,
+    };
+
+    glm::vec3 frustum_center(0.0f);
+    for (const auto& corner : frustum_corners) {
+        frustum_center += corner;
+    }
+    frustum_center /= static_cast<float>(frustum_corners.size());
+
+    glm::vec3 light_dir_norm = glm::normalize(light_dir);
+    glm::vec3 light_pos = frustum_center - light_dir_norm * (config.shadow_distance * 0.5f);
+    glm::vec3 up_dir = glm::vec3(0.0f, 1.0f, 0.0f);
+    if (std::abs(glm::dot(up_dir, light_dir_norm)) > 0.99f) {
+        up_dir = glm::vec3(0.0f, 0.0f, 1.0f);
+    }
+
+    glm::mat4 light_view = glm::lookAt(light_pos, frustum_center, up_dir);
+
+    glm::vec3 min_bounds(FLT_MAX);
+    glm::vec3 max_bounds(-FLT_MAX);
+
+    for (const auto& corner : frustum_corners) {
+        glm::vec4 corner_ls = light_view * glm::vec4(corner, 1.0f);
+        min_bounds = glm::min(min_bounds, glm::vec3(corner_ls));
+        max_bounds = glm::max(max_bounds, glm::vec3(corner_ls));
+    }
+
+    float extent_x = max_bounds.x - min_bounds.x;
+    float extent_y = max_bounds.y - min_bounds.y;
+    float texel_size_x = extent_x / static_cast<float>(config.resolution);
+    float texel_size_y = extent_y / static_cast<float>(config.resolution);
+
+    min_bounds.x = std::floor(min_bounds.x / texel_size_x) * texel_size_x;
+    min_bounds.y = std::floor(min_bounds.y / texel_size_y) * texel_size_y;
+    max_bounds.x = std::ceil(max_bounds.x / texel_size_x) * texel_size_x;
+    max_bounds.y = std::ceil(max_bounds.y / texel_size_y) * texel_size_y;
+
+    float z_mult = 10.0f;
+    if (min_bounds.z < 0.0f) {
+        min_bounds.z *= z_mult;
+    } else {
+        min_bounds.z /= z_mult;
+    }
+
+    if (max_bounds.z < 0.0f) {
+        max_bounds.z /= z_mult;
+    } else {
+        max_bounds.z *= z_mult;
+    }
+
+    glm::mat4 light_proj = glm::ortho(min_bounds.x, max_bounds.x, min_bounds.y, max_bounds.y,
+                                      min_bounds.z, max_bounds.z);
+
+    return light_proj * light_view;
 }
 
 // ============================================================================
@@ -449,8 +535,8 @@ void DeferredRenderer::begin_geometry_pass(rhi::CommandList& cmd, const Camera& 
     // 5. Bind Camera Descriptor Set
     cmd.bind_descriptor_set(*m_geometry_layout, 0, *m_camera_set);
 
-    m_csm.update_cascades(
-        camera, glm::vec3(0.0f, -1.0f, 0.0f)); // Update shadow cascades (placeholder light dir)
+    m_csm.update_cascades(camera, glm::vec3(0.0f, -1.0f, 0.0f),
+                          aspect); // Update shadow cascades (placeholder light dir)
 }
 
 void DeferredRenderer::end_geometry_pass(rhi::CommandList& cmd) {
@@ -481,7 +567,9 @@ void DeferredRenderer::end_geometry_pass(rhi::CommandList& cmd) {
 }
 
 void DeferredRenderer::update_csm(const Camera& camera, const glm::vec3& light_dir) {
-    m_csm.update_cascades(camera, light_dir);
+    float aspect_ratio =
+        m_height == 0 ? 1.0f : static_cast<float>(m_width) / static_cast<float>(m_height);
+    m_csm.update_cascades(camera, light_dir, aspect_ratio);
 }
 
 void DeferredRenderer::begin_shadow_pass(rhi::CommandList& cmd, u32 cascade_index) {

@@ -207,6 +207,32 @@ endif()
 
 FetchContent_MakeAvailable(glfw spdlog stb tinyobjloader JoltPhysics imgui miniaudio entt VulkanMemoryAllocator volk spirv_headers spirv_tools glslang shaderc)
 
+# Suppress strict warnings for third-party dependencies that fail under MinGW GCC.
+# These targets have known issues with -Wconversion, -Wshadow, and missing <cstdint>.
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang|GNU")
+    set(_THIRD_PARTY_SUPPRESS_FLAGS -w -fpermissive "-include" "cstdint")
+
+    # Collect known problematic targets
+    set(_SUPPRESS_TARGETS "")
+    foreach(_target SPIRV glslang MachineIndependent GenericCodeGen
+                    OSDependent OGLCompiler SPIRV-Tools-static
+                    SPIRV-Tools-opt SPIRV-Tools-shared SPIRV-Tools-link
+                    SPIRV-Tools-lint SPIRV-Tools-diff SPIRV-Tools-reduce
+                    spirv-as spirv-dis spirv-val spirv-opt spirv-link
+                    spirv-lint spirv-diff spirv-cfg spirv-reduce
+                    spirv-objdump spirv-tools-cpp-example
+                    shaderc shaderc_util shaderc_shared glslc glslc_exe
+                    glslang-standalone spirv-remap)
+        if(TARGET ${_target})
+            list(APPEND _SUPPRESS_TARGETS ${_target})
+        endif()
+    endforeach()
+
+    foreach(_target ${_SUPPRESS_TARGETS})
+        target_compile_options(${_target} PRIVATE ${_THIRD_PARTY_SUPPRESS_FLAGS})
+    endforeach()
+endif()
+
 # Manually setup GLM to avoid its deprecated CMakeLists.txt
 FetchContent_GetProperties(glm)
 if(NOT glm_POPULATED)

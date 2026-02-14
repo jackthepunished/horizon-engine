@@ -97,21 +97,15 @@ Model Model::load_from_obj(std::string_view path) {
     return model;
 }
 
-void Model::draw() const {
+void Model::draw(rhi::CommandList& cmd) const {
     for (const auto& mesh : m_meshes) {
-        mesh.draw();
+        mesh.draw(cmd);
     }
 }
 
-void Model::setup_instancing(const std::vector<glm::mat4>& instance_transforms) {
-    for (auto& mesh : m_meshes) {
-        mesh.setup_instancing(instance_transforms);
-    }
-}
-
-void Model::draw_instanced(u32 instance_count) const {
+void Model::draw_instanced(rhi::CommandList& cmd, u32 instance_count) const {
     for (const auto& mesh : m_meshes) {
-        mesh.draw_instanced(instance_count);
+        mesh.draw_instanced(cmd, instance_count);
     }
 }
 

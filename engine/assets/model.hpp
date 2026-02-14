@@ -10,6 +10,7 @@
 #include "engine/assets/texture.hpp"
 #include "engine/core/types.hpp"
 #include "engine/renderer/mesh.hpp"
+#include "engine/rhi/rhi_command_list.hpp"
 
 #include <memory>
 #include <string>
@@ -72,17 +73,12 @@ public:
     /**
      * @brief Draw all meshes
      */
-    void draw() const;
-
-    /**
-     * @brief Setup instancing for all meshes
-     */
-    void setup_instancing(const std::vector<glm::mat4>& instance_transforms);
+    void draw(rhi::CommandList& cmd) const;
 
     /**
      * @brief Draw all meshes instanced
      */
-    void draw_instanced(u32 instance_count) const;
+    void draw_instanced(rhi::CommandList& cmd, u32 instance_count) const;
 
     /**
      * @brief Check if model is valid
