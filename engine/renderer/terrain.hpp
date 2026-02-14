@@ -9,7 +9,9 @@
  */
 
 #include "engine/core/types.hpp"
-#include "mesh.hpp"
+#include "engine/rhi/rhi_command_list.hpp"
+#include "engine/rhi/rhi_device.hpp"
+#include "engine/rhi/rhi_resources.hpp"
 
 #include <memory>
 #include <string>
@@ -58,13 +60,13 @@ public:
      * @return true if successful
      */
     [[nodiscard]] bool generate_from_heightmap(const std::string& heightmap_path,
-                                               const TerrainConfig& config);
+                                               const TerrainConfig& config, rhi::Device& device);
 
     /**
      * @brief Generate flat terrain (for testing)
      * @param config Terrain configuration
      */
-    void generate_flat(const TerrainConfig& config);
+    void generate_flat(const TerrainConfig& config, rhi::Device& device);
 
     /**
      * @brief Generate terrain using Perlin noise
@@ -73,13 +75,13 @@ public:
      * @param octaves Noise octaves (detail levels)
      * @param persistence Amplitude falloff per octave
      */
-    void generate_procedural(const TerrainConfig& config, u32 seed = 0, u32 octaves = 4,
-                             float persistence = 0.5f);
+    void generate_procedural(const TerrainConfig& config, rhi::Device& device, u32 seed = 0,
+                             u32 octaves = 4, float persistence = 0.5f);
 
     /**
      * @brief Draw the terrain
      */
-    void draw() const;
+    void draw(rhi::CommandList& cmd) const;
 
     /**
      * @brief Get height at world position (for physics/gameplay)
@@ -99,12 +101,13 @@ public:
     /**
      * @brief Check if terrain is ready
      */
-    [[nodiscard]] bool is_valid() const { return m_vao != 0; }
+    [[nodiscard]] bool is_valid() const { return m_vertex_buffer != nullptr; }
 
 private:
     void calculate_normals(std::vector<TerrainVertex>& vertices, const std::vector<u32>& indices,
                            u32 grid_width, u32 grid_depth);
-    void upload_mesh(const std::vector<TerrainVertex>& vertices, const std::vector<u32>& indices);
+    void upload_mesh(const std::vector<TerrainVertex>& vertices, const std::vector<u32>& indices,
+                     rhi::Device& device);
 
     // Simple noise function for procedural generation
     [[nodiscard]] static float noise2d(float x, float y, u32 seed);
@@ -115,10 +118,9 @@ private:
     u32 m_heightmap_width{0};
     u32 m_heightmap_depth{0};
 
-    // OpenGL buffers
-    u32 m_vao{0};
-    u32 m_vbo{0};
-    u32 m_ebo{0};
+    // RHI buffers
+    std::unique_ptr<rhi::Buffer> m_vertex_buffer;
+    std::unique_ptr<rhi::Buffer> m_index_buffer;
     u32 m_index_count{0};
 };
 

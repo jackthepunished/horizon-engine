@@ -1,7 +1,6 @@
 #include "terrain.hpp"
 
 #include "engine/core/log.hpp"
-#include "opengl/gl_context.hpp"
 
 #include <cmath>
 
@@ -9,7 +8,8 @@
 
 namespace hz {
 
-bool Terrain::generate_from_heightmap(const std::string& heightmap_path, const TerrainConfig& config) {
+bool Terrain::generate_from_heightmap(const std::string& heightmap_path,
+                                      const TerrainConfig& config, rhi::Device& device) {
     m_config = config;
 
     // Load heightmap
@@ -45,26 +45,23 @@ bool Terrain::generate_from_heightmap(const std::string& heightmap_path, const T
             float height_value = m_heightmap_data[static_cast<size_t>(z * width + x)];
 
             TerrainVertex vertex;
-            
+
             // Position: centered at origin
             float px = (static_cast<float>(x) / (width - 1)) * config.width - half_width;
             float pz = (static_cast<float>(z) / (height - 1)) * config.depth - half_depth;
             float py = height_value * config.max_height;
-            
+
             vertex.position = glm::vec3(px, py, pz);
             vertex.normal = glm::vec3(0.0f, 1.0f, 0.0f); // Will be calculated later
-            
+
             // Detail texture coords (tiled)
-            vertex.texcoord = glm::vec2(
-                static_cast<float>(x) / (width - 1) * config.texture_scale,
-                static_cast<float>(z) / (height - 1) * config.texture_scale
-            );
-            
+            vertex.texcoord =
+                glm::vec2(static_cast<float>(x) / (width - 1) * config.texture_scale,
+                          static_cast<float>(z) / (height - 1) * config.texture_scale);
+
             // Splatmap coords (0-1 range)
-            vertex.splatcoord = glm::vec2(
-                static_cast<float>(x) / (width - 1),
-                static_cast<float>(z) / (height - 1)
-            );
+            vertex.splatcoord = glm::vec2(static_cast<float>(x) / (width - 1),
+                                          static_cast<float>(z) / (height - 1));
 
             vertices.push_back(vertex);
         }
@@ -99,15 +96,15 @@ bool Terrain::generate_from_heightmap(const std::string& heightmap_path, const T
     calculate_normals(vertices, indices, static_cast<u32>(width), static_cast<u32>(height));
 
     // Upload to GPU
-    upload_mesh(vertices, indices);
+    upload_mesh(vertices, indices, device);
 
-    HZ_ENGINE_INFO("Generated terrain: {}x{} vertices, {} triangles", 
-                   width, height, indices.size() / 3);
+    HZ_ENGINE_INFO("Generated terrain: {}x{} vertices, {} triangles", width, height,
+                   indices.size() / 3);
 
     return true;
 }
 
-void Terrain::generate_flat(const TerrainConfig& config) {
+void Terrain::generate_flat(const TerrainConfig& config, rhi::Device& device) {
     m_config = config;
     m_heightmap_width = config.resolution;
     m_heightmap_depth = config.resolution;
@@ -124,20 +121,19 @@ void Terrain::generate_flat(const TerrainConfig& config) {
     for (u32 z = 0; z < config.resolution; ++z) {
         for (u32 x = 0; x < config.resolution; ++x) {
             TerrainVertex vertex;
-            
-            float px = (static_cast<float>(x) / (config.resolution - 1)) * config.width - half_width;
-            float pz = (static_cast<float>(z) / (config.resolution - 1)) * config.depth - half_depth;
-            
+
+            float px =
+                (static_cast<float>(x) / (config.resolution - 1)) * config.width - half_width;
+            float pz =
+                (static_cast<float>(z) / (config.resolution - 1)) * config.depth - half_depth;
+
             vertex.position = glm::vec3(px, 0.0f, pz);
             vertex.normal = glm::vec3(0.0f, 1.0f, 0.0f);
-            vertex.texcoord = glm::vec2(
-                static_cast<float>(x) / (config.resolution - 1) * config.texture_scale,
-                static_cast<float>(z) / (config.resolution - 1) * config.texture_scale
-            );
-            vertex.splatcoord = glm::vec2(
-                static_cast<float>(x) / (config.resolution - 1),
-                static_cast<float>(z) / (config.resolution - 1)
-            );
+            vertex.texcoord =
+                glm::vec2(static_cast<float>(x) / (config.resolution - 1) * config.texture_scale,
+                          static_cast<float>(z) / (config.resolution - 1) * config.texture_scale);
+            vertex.splatcoord = glm::vec2(static_cast<float>(x) / (config.resolution - 1),
+                                          static_cast<float>(z) / (config.resolution - 1));
 
             vertices.push_back(vertex);
         }
@@ -162,12 +158,12 @@ void Terrain::generate_flat(const TerrainConfig& config) {
         }
     }
 
-    upload_mesh(vertices, indices);
+    upload_mesh(vertices, indices, device);
     HZ_ENGINE_INFO("Generated flat terrain: {}x{}", config.resolution, config.resolution);
 }
 
-void Terrain::generate_procedural(const TerrainConfig& config, u32 seed, 
-                                   u32 octaves, float persistence) {
+void Terrain::generate_procedural(const TerrainConfig& config, rhi::Device& device, u32 seed,
+                                  u32 octaves, float persistence) {
     m_config = config;
     m_heightmap_width = config.resolution;
     m_heightmap_depth = config.resolution;
@@ -191,21 +187,20 @@ void Terrain::generate_procedural(const TerrainConfig& config, u32 seed,
             m_heightmap_data[z * config.resolution + x] = height_value;
 
             TerrainVertex vertex;
-            
-            float px = (static_cast<float>(x) / (config.resolution - 1)) * config.width - half_width;
-            float pz = (static_cast<float>(z) / (config.resolution - 1)) * config.depth - half_depth;
+
+            float px =
+                (static_cast<float>(x) / (config.resolution - 1)) * config.width - half_width;
+            float pz =
+                (static_cast<float>(z) / (config.resolution - 1)) * config.depth - half_depth;
             float py = height_value * config.max_height;
-            
+
             vertex.position = glm::vec3(px, py, pz);
             vertex.normal = glm::vec3(0.0f, 1.0f, 0.0f);
-            vertex.texcoord = glm::vec2(
-                static_cast<float>(x) / (config.resolution - 1) * config.texture_scale,
-                static_cast<float>(z) / (config.resolution - 1) * config.texture_scale
-            );
-            vertex.splatcoord = glm::vec2(
-                static_cast<float>(x) / (config.resolution - 1),
-                static_cast<float>(z) / (config.resolution - 1)
-            );
+            vertex.texcoord =
+                glm::vec2(static_cast<float>(x) / (config.resolution - 1) * config.texture_scale,
+                          static_cast<float>(z) / (config.resolution - 1) * config.texture_scale);
+            vertex.splatcoord = glm::vec2(static_cast<float>(x) / (config.resolution - 1),
+                                          static_cast<float>(z) / (config.resolution - 1));
 
             vertices.push_back(vertex);
         }
@@ -231,22 +226,26 @@ void Terrain::generate_procedural(const TerrainConfig& config, u32 seed,
     }
 
     calculate_normals(vertices, indices, config.resolution, config.resolution);
-    upload_mesh(vertices, indices);
+    upload_mesh(vertices, indices, device);
 
-    HZ_ENGINE_INFO("Generated procedural terrain: {}x{} with {} octaves", 
-                   config.resolution, config.resolution, octaves);
+    HZ_ENGINE_INFO("Generated procedural terrain: {}x{} with {} octaves", config.resolution,
+                   config.resolution, octaves);
 }
 
-void Terrain::draw() const {
-    if (m_vao == 0) return;
+void Terrain::draw(rhi::CommandList& cmd) const {
+    if (!m_vertex_buffer)
+        return;
 
-    glBindVertexArray(m_vao);
-    glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(m_index_count), GL_UNSIGNED_INT, nullptr);
-    glBindVertexArray(0);
+    cmd.bind_vertex_buffer(0, *m_vertex_buffer);
+    if (m_index_buffer) {
+        cmd.bind_index_buffer(*m_index_buffer, 0, rhi::IndexType::Uint32);
+        cmd.draw_indexed(m_index_count);
+    }
 }
 
 float Terrain::get_height_at(float x, float z) const {
-    if (m_heightmap_data.empty()) return 0.0f;
+    if (m_heightmap_data.empty())
+        return 0.0f;
 
     // Convert world coords to heightmap coords
     float half_width = m_config.width / 2.0f;
@@ -279,9 +278,8 @@ float Terrain::get_height_at(float x, float z) const {
     return glm::mix(h0, h1, fz) * m_config.max_height;
 }
 
-void Terrain::calculate_normals(std::vector<TerrainVertex>& vertices, 
-                                 const std::vector<u32>& indices,
-                                 u32 grid_width, u32 grid_depth) {
+void Terrain::calculate_normals(std::vector<TerrainVertex>& vertices,
+                                const std::vector<u32>& indices, u32 grid_width, u32 grid_depth) {
     // Reset normals
     for (auto& v : vertices) {
         v.normal = glm::vec3(0.0f);
@@ -312,51 +310,11 @@ void Terrain::calculate_normals(std::vector<TerrainVertex>& vertices,
     }
 }
 
-void Terrain::upload_mesh(const std::vector<TerrainVertex>& vertices, 
-                          const std::vector<u32>& indices) {
-    // Clean up old buffers
-    if (m_vao) glDeleteVertexArrays(1, &m_vao);
-    if (m_vbo) glDeleteBuffers(1, &m_vbo);
-    if (m_ebo) glDeleteBuffers(1, &m_ebo);
-
-    glGenVertexArrays(1, &m_vao);
-    glGenBuffers(1, &m_vbo);
-    glGenBuffers(1, &m_ebo);
-
-    glBindVertexArray(m_vao);
-
-    glBindBuffer(GL_ARRAY_BUFFER, m_vbo);
-    glBufferData(GL_ARRAY_BUFFER, 
-                 static_cast<GLsizeiptr>(vertices.size() * sizeof(TerrainVertex)),
-                 vertices.data(), GL_STATIC_DRAW);
-
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, m_ebo);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER,
-                 static_cast<GLsizeiptr>(indices.size() * sizeof(u32)),
-                 indices.data(), GL_STATIC_DRAW);
-
-    // Position (location 0)
-    glEnableVertexAttribArray(0);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(TerrainVertex),
-                          reinterpret_cast<void*>(offsetof(TerrainVertex, position)));
-
-    // Normal (location 1)
-    glEnableVertexAttribArray(1);
-    glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, sizeof(TerrainVertex),
-                          reinterpret_cast<void*>(offsetof(TerrainVertex, normal)));
-
-    // Texcoord (location 2)
-    glEnableVertexAttribArray(2);
-    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, sizeof(TerrainVertex),
-                          reinterpret_cast<void*>(offsetof(TerrainVertex, texcoord)));
-
-    // Splatcoord (location 3)
-    glEnableVertexAttribArray(3);
-    glVertexAttribPointer(3, 2, GL_FLOAT, GL_FALSE, sizeof(TerrainVertex),
-                          reinterpret_cast<void*>(offsetof(TerrainVertex, splatcoord)));
-
-    glBindVertexArray(0);
-
+void Terrain::upload_mesh(const std::vector<TerrainVertex>& vertices,
+                          const std::vector<u32>& indices, rhi::Device& device) {
+    m_vertex_buffer =
+        device.create_vertex_buffer(std::span<const TerrainVertex>(vertices), "Terrain VB");
+    m_index_buffer = device.create_index_buffer(std::span<const u32>(indices), "Terrain IB");
     m_index_count = static_cast<u32>(indices.size());
 }
 
@@ -364,7 +322,7 @@ void Terrain::upload_mesh(const std::vector<TerrainVertex>& vertices,
 float Terrain::noise2d(float x, float y, u32 seed) {
     int xi = static_cast<int>(std::floor(x));
     int yi = static_cast<int>(std::floor(y));
-    
+
     auto hash = [seed](int x, int y) -> float {
         int n = x + y * 57 + seed * 131;
         n = (n << 13) ^ n;
