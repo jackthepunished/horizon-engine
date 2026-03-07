@@ -47,21 +47,23 @@ bool Terrain::generate_from_heightmap(const std::string& heightmap_path,
             TerrainVertex vertex;
 
             // Position: centered at origin
-            float px = (static_cast<float>(x) / (width - 1)) * config.width - half_width;
-            float pz = (static_cast<float>(z) / (height - 1)) * config.depth - half_depth;
+            float px =
+                (static_cast<float>(x) / static_cast<float>(width - 1)) * config.width - half_width;
+            float pz = (static_cast<float>(z) / static_cast<float>(height - 1)) * config.depth -
+                       half_depth;
             float py = height_value * config.max_height;
 
             vertex.position = glm::vec3(px, py, pz);
             vertex.normal = glm::vec3(0.0f, 1.0f, 0.0f); // Will be calculated later
 
             // Detail texture coords (tiled)
-            vertex.texcoord =
-                glm::vec2(static_cast<float>(x) / (width - 1) * config.texture_scale,
-                          static_cast<float>(z) / (height - 1) * config.texture_scale);
+            vertex.texcoord = glm::vec2(
+                static_cast<float>(x) / static_cast<float>(width - 1) * config.texture_scale,
+                static_cast<float>(z) / static_cast<float>(height - 1) * config.texture_scale);
 
             // Splatmap coords (0-1 range)
-            vertex.splatcoord = glm::vec2(static_cast<float>(x) / (width - 1),
-                                          static_cast<float>(z) / (height - 1));
+            vertex.splatcoord = glm::vec2(static_cast<float>(x) / static_cast<float>(width - 1),
+                                          static_cast<float>(z) / static_cast<float>(height - 1));
 
             vertices.push_back(vertex);
         }
@@ -123,17 +125,22 @@ void Terrain::generate_flat(const TerrainConfig& config, rhi::Device& device) {
             TerrainVertex vertex;
 
             float px =
-                (static_cast<float>(x) / (config.resolution - 1)) * config.width - half_width;
+                (static_cast<float>(x) / static_cast<float>(config.resolution - 1)) * config.width -
+                half_width;
             float pz =
-                (static_cast<float>(z) / (config.resolution - 1)) * config.depth - half_depth;
+                (static_cast<float>(z) / static_cast<float>(config.resolution - 1)) * config.depth -
+                half_depth;
 
             vertex.position = glm::vec3(px, 0.0f, pz);
             vertex.normal = glm::vec3(0.0f, 1.0f, 0.0f);
             vertex.texcoord =
-                glm::vec2(static_cast<float>(x) / (config.resolution - 1) * config.texture_scale,
-                          static_cast<float>(z) / (config.resolution - 1) * config.texture_scale);
-            vertex.splatcoord = glm::vec2(static_cast<float>(x) / (config.resolution - 1),
-                                          static_cast<float>(z) / (config.resolution - 1));
+                glm::vec2(static_cast<float>(x) / static_cast<float>(config.resolution - 1) *
+                              config.texture_scale,
+                          static_cast<float>(z) / static_cast<float>(config.resolution - 1) *
+                              config.texture_scale);
+            vertex.splatcoord =
+                glm::vec2(static_cast<float>(x) / static_cast<float>(config.resolution - 1),
+                          static_cast<float>(z) / static_cast<float>(config.resolution - 1));
 
             vertices.push_back(vertex);
         }
@@ -179,8 +186,8 @@ void Terrain::generate_procedural(const TerrainConfig& config, rhi::Device& devi
     for (u32 z = 0; z < config.resolution; ++z) {
         for (u32 x = 0; x < config.resolution; ++x) {
             // Generate height using Perlin noise
-            float nx = static_cast<float>(x) / config.resolution * 4.0f;
-            float nz = static_cast<float>(z) / config.resolution * 4.0f;
+            float nx = static_cast<float>(x) / static_cast<float>(config.resolution) * 4.0f;
+            float nz = static_cast<float>(z) / static_cast<float>(config.resolution) * 4.0f;
             float height_value = perlin2d(nx, nz, seed, octaves, persistence);
             height_value = (height_value + 1.0f) * 0.5f; // Normalize to 0-1
 
@@ -189,18 +196,23 @@ void Terrain::generate_procedural(const TerrainConfig& config, rhi::Device& devi
             TerrainVertex vertex;
 
             float px =
-                (static_cast<float>(x) / (config.resolution - 1)) * config.width - half_width;
+                (static_cast<float>(x) / static_cast<float>(config.resolution - 1)) * config.width -
+                half_width;
             float pz =
-                (static_cast<float>(z) / (config.resolution - 1)) * config.depth - half_depth;
+                (static_cast<float>(z) / static_cast<float>(config.resolution - 1)) * config.depth -
+                half_depth;
             float py = height_value * config.max_height;
 
             vertex.position = glm::vec3(px, py, pz);
             vertex.normal = glm::vec3(0.0f, 1.0f, 0.0f);
             vertex.texcoord =
-                glm::vec2(static_cast<float>(x) / (config.resolution - 1) * config.texture_scale,
-                          static_cast<float>(z) / (config.resolution - 1) * config.texture_scale);
-            vertex.splatcoord = glm::vec2(static_cast<float>(x) / (config.resolution - 1),
-                                          static_cast<float>(z) / (config.resolution - 1));
+                glm::vec2(static_cast<float>(x) / static_cast<float>(config.resolution - 1) *
+                              config.texture_scale,
+                          static_cast<float>(z) / static_cast<float>(config.resolution - 1) *
+                              config.texture_scale);
+            vertex.splatcoord =
+                glm::vec2(static_cast<float>(x) / static_cast<float>(config.resolution - 1),
+                          static_cast<float>(z) / static_cast<float>(config.resolution - 1));
 
             vertices.push_back(vertex);
         }
@@ -251,8 +263,8 @@ float Terrain::get_height_at(float x, float z) const {
     float half_width = m_config.width / 2.0f;
     float half_depth = m_config.depth / 2.0f;
 
-    float hx = (x + half_width) / m_config.width * (m_heightmap_width - 1);
-    float hz = (z + half_depth) / m_config.depth * (m_heightmap_depth - 1);
+    float hx = (x + half_width) / m_config.width * static_cast<float>(m_heightmap_width - 1);
+    float hz = (z + half_depth) / m_config.depth * static_cast<float>(m_heightmap_depth - 1);
 
     // Clamp to bounds
     hx = glm::clamp(hx, 0.0f, static_cast<float>(m_heightmap_width - 1));
@@ -264,8 +276,8 @@ float Terrain::get_height_at(float x, float z) const {
     int x1 = glm::min(x0 + 1, static_cast<int>(m_heightmap_width - 1));
     int z1 = glm::min(z0 + 1, static_cast<int>(m_heightmap_depth - 1));
 
-    float fx = hx - x0;
-    float fz = hz - z0;
+    float fx = hx - static_cast<float>(x0);
+    float fz = hz - static_cast<float>(z0);
 
     float h00 = m_heightmap_data[static_cast<size_t>(z0 * m_heightmap_width + x0)];
     float h10 = m_heightmap_data[static_cast<size_t>(z0 * m_heightmap_width + x1)];
@@ -323,14 +335,16 @@ float Terrain::noise2d(float x, float y, u32 seed) {
     int xi = static_cast<int>(std::floor(x));
     int yi = static_cast<int>(std::floor(y));
 
-    auto hash = [seed](int x, int y) -> float {
-        int n = x + y * 57 + seed * 131;
+    auto hash = [seed](int lx, int ly) -> float {
+        int n = lx + ly * 57 + static_cast<int>(seed) * 131;
         n = (n << 13) ^ n;
-        return (1.0f - ((n * (n * n * 15731 + 789221) + 1376312589) & 0x7fffffff) / 1073741824.0f);
+        return (1.0f -
+                static_cast<float>((n * (n * n * 15731 + 789221) + 1376312589) & 0x7fffffff) /
+                    1073741824.0f);
     };
 
-    float fx = x - xi;
-    float fy = y - yi;
+    float fx = x - static_cast<float>(xi);
+    float fy = y - static_cast<float>(yi);
 
     // Smoothstep
     fx = fx * fx * (3 - 2 * fx);

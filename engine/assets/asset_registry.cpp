@@ -261,10 +261,10 @@ SoundHandle AssetRegistry::load_sound(const std::string& path, AudioSystem& audi
 
 void AssetRegistry::reload_all() {
     for (u32 i = 0; i < m_textures.size(); ++i) {
-        reload_texture({i, m_textures[i].generation});
+        (void)reload_texture({i, m_textures[i].generation});
     }
     for (u32 i = 0; i < m_models.size(); ++i) {
-        reload_model({i, m_models[i].generation});
+        (void)reload_model({i, m_models[i].generation});
     }
 }
 

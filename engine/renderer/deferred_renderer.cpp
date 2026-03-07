@@ -7,6 +7,7 @@
 #include <cfloat>
 #include <cmath>
 #include <fstream>
+#include <random>
 #include <sstream>
 
 namespace hz {
@@ -144,7 +145,7 @@ void CascadedShadowMap::calculate_cascade_splits(const Camera& camera) {
 
     // Calculate split depths based on lambda (mix between uniform and logarithmic)
     for (u32 i = 0; i < config.cascade_count; ++i) {
-        float p = (i + 1) / static_cast<float>(config.cascade_count);
+        float p = static_cast<float>(i + 1) / static_cast<float>(config.cascade_count);
         float log = min_z * std::pow(ratio, p);
         float uniform = min_z + range * p;
         float d = config.split_lambda * (log - uniform) + uniform;
@@ -240,6 +241,296 @@ glm::mat4 CascadedShadowMap::calculate_light_space_matrix(u32 cascade, const Cam
                                       min_bounds.z, max_bounds.z);
 
     return light_proj * light_view;
+}
+
+// ============================================================================
+// SSAO Pass
+// ============================================================================
+
+void SSAOPass::create(rhi::Device& device, u32 w, u32 h, const SSAOConfig& cfg,
+                      const rhi::DescriptorSetLayout& camera_layout,
+                      const rhi::DescriptorSetLayout& gbuffer_layout) {
+    width = static_cast<u32>(w * cfg.resolution_scale);
+    height = static_cast<u32>(h * cfg.resolution_scale);
+    config = cfg;
+
+    // 1. Create Textures
+    {
+        rhi::TextureDesc desc{};
+        desc.width = width;
+        desc.height = height;
+        desc.format = rhi::Format::R8_UNORM;
+        desc.usage = rhi::TextureUsage::RenderTarget | rhi::TextureUsage::Sampled;
+        desc.debug_name = "SSAO Raw";
+        color_texture = device.create_texture(desc);
+        color_view = device.create_texture_view(*color_texture);
+
+        desc.debug_name = "SSAO Blur";
+        blur_texture = device.create_texture(desc);
+        blur_view = device.create_texture_view(*blur_texture);
+    }
+
+    // 2. Generate Kernel
+    std::vector<glm::vec4> kernel;
+    {
+        std::uniform_real_distribution<float> random_floats(0.0, 1.0);
+        std::default_random_engine generator;
+        for (int i = 0; i < 64; ++i) {
+            glm::vec3 sample(random_floats(generator) * 2.0 - 1.0,
+                             random_floats(generator) * 2.0 - 1.0, random_floats(generator));
+            sample = glm::normalize(sample);
+            sample *= random_floats(generator);
+            float scale = float(i) / 64.0;
+            scale = 0.1f + (scale * scale) * (1.0f - 0.1f);
+            sample *= scale;
+            kernel.push_back(glm::vec4(sample, 0.0f));
+        }
+    }
+    kernel_ubo = device.create_buffer(
+        {sizeof(glm::vec4) * 64, rhi::BufferUsage::UniformBuffer, rhi::MemoryUsage::CPU_To_GPU});
+    void* data = kernel_ubo->map();
+    memcpy(data, kernel.data(), sizeof(glm::vec4) * 64);
+    kernel_ubo->unmap();
+
+    // 3. Generate Noise Texture
+    {
+        std::vector<glm::vec4> noise;
+        std::uniform_real_distribution<float> random_floats(0.0, 1.0);
+        std::default_random_engine generator;
+        for (unsigned int i = 0; i < 16; i++) {
+            glm::vec4 sample(random_floats(generator) * 2.0 - 1.0,
+                             random_floats(generator) * 2.0 - 1.0, 0.0f, 0.0f);
+            noise.push_back(sample);
+        }
+
+        rhi::TextureDesc desc{};
+        desc.width = 4;
+        desc.height = 4;
+        desc.format = rhi::Format::RGBA16_FLOAT;
+        desc.usage = rhi::TextureUsage::Sampled | rhi::TextureUsage::TransferDst;
+        desc.debug_name = "SSAO Noise";
+        noise_texture = device.create_texture(desc);
+        noise_view = device.create_texture_view(*noise_texture);
+
+        // TODO: Upload noise data via staging buffer and command list.
+    }
+
+    params_ubo = device.create_buffer(
+        {sizeof(SSAOConfig), rhi::BufferUsage::UniformBuffer, rhi::MemoryUsage::CPU_To_GPU});
+
+    // 4. Create Descriptors & Pipelines
+    // SSAO Generation
+    {
+        rhi::DescriptorSetLayoutDesc desc;
+        desc.bindings.push_back(
+            rhi::DescriptorBinding::uniform_buffer(0, rhi::ShaderStage::Fragment)); // Kernel
+        desc.bindings.push_back(
+            rhi::DescriptorBinding::uniform_buffer(1, rhi::ShaderStage::Fragment)); // Params
+        desc.bindings.push_back(
+            rhi::DescriptorBinding::combined_image_sampler(2, rhi::ShaderStage::Fragment)); // Noise
+        descriptor_layout = device.create_descriptor_set_layout(desc);
+    }
+
+    // Create Repeat Sampler
+    auto sampler = device.create_sampler({rhi::Filter::Nearest, rhi::Filter::Nearest,
+                                          rhi::MipmapMode::Nearest, rhi::AddressMode::Repeat,
+                                          rhi::AddressMode::Repeat, rhi::AddressMode::Repeat});
+
+    // 5. Descriptor Pool
+    {
+        rhi::DescriptorPoolDesc desc{};
+        desc.pool_sizes = {{rhi::DescriptorType::UniformBuffer, 2},
+                           {rhi::DescriptorType::CombinedImageSampler, 2}};
+        desc.max_sets = 2; // SSAO Set + Blur Set
+        descriptor_pool = device.create_descriptor_pool(desc);
+    }
+
+    // 6. SSAO Descriptors & Pipeline
+    {
+        // Create Pipeline Layout
+        rhi::PipelineLayoutDesc pl_desc{};
+        pl_desc.set_layouts = {&camera_layout, &gbuffer_layout, descriptor_layout.get()};
+        pipeline_layout = device.create_pipeline_layout(pl_desc);
+
+        // Create Pipeline (using temp RenderPass for compatibility)
+        auto rp_desc = rhi::RenderPassDesc::simple(rhi::Format::R8_UNORM);
+        auto temp_rp = device.create_render_pass(rp_desc);
+
+        rhi::GraphicsPipelineDesc pipe_desc{};
+        pipe_desc.layout = pipeline_layout.get();
+        pipe_desc.render_pass = temp_rp.get();
+
+        rhi::VertexInputLayout item_layout;
+        item_layout.bindings.push_back({0, 5 * sizeof(float), rhi::VertexInputRate::Vertex});
+        item_layout.attributes.push_back({0, 0, rhi::Format::RGB32_FLOAT, 0});
+        item_layout.attributes.push_back({1, 0, rhi::Format::RG32_FLOAT, 3 * sizeof(float)});
+        pipe_desc.vertex_layout = item_layout;
+
+        auto vs = device.create_shader_from_file("assets/shaders/deferred/vk_fullscreen.vert",
+                                                 rhi::ShaderStage::Vertex, "FullscreenVert");
+        auto fs = device.create_shader_from_file("assets/shaders/ssao.frag",
+                                                 rhi::ShaderStage::Fragment, "SSAOFrag");
+
+        if (vs && fs) {
+            pipe_desc.vertex_shader = vs.get();
+            pipe_desc.fragment_shader = fs.get();
+            pipe_desc.topology = rhi::PrimitiveTopology::TriangleList;
+            pipeline = device.create_graphics_pipeline(pipe_desc);
+        }
+
+        descriptor_set = descriptor_pool->allocate(*descriptor_layout);
+        descriptor_set->write_buffer(0, *kernel_ubo);
+        descriptor_set->write_buffer(1, *params_ubo);
+        descriptor_set->write_texture(2, *noise_view, *sampler);
+    }
+
+    // 7. Blur Descriptors & Pipeline
+    {
+        // Layout: Set 0 (SSAO Input)
+        rhi::DescriptorSetLayoutDesc desc;
+        desc.bindings.push_back(
+            rhi::DescriptorBinding::combined_image_sampler(0, rhi::ShaderStage::Fragment));
+        blur_descriptor_layout = device.create_descriptor_set_layout(desc);
+
+        blur_descriptor_set = descriptor_pool->allocate(*blur_descriptor_layout);
+
+        auto linear_sampler =
+            device.create_sampler({rhi::Filter::Linear, rhi::Filter::Linear,
+                                   rhi::MipmapMode::Linear, rhi::AddressMode::ClampToEdge,
+                                   rhi::AddressMode::ClampToEdge, rhi::AddressMode::ClampToEdge});
+        blur_descriptor_set->write_texture(0, *color_view, *linear_sampler);
+
+        // Pipeline Layout
+        rhi::PipelineLayoutDesc pl_desc{};
+        pl_desc.set_layouts = {blur_descriptor_layout.get()};
+        blur_layout = device.create_pipeline_layout(pl_desc);
+
+        // Pipeline
+        auto rp_desc = rhi::RenderPassDesc::simple(rhi::Format::R8_UNORM);
+        auto temp_rp = device.create_render_pass(rp_desc);
+
+        rhi::GraphicsPipelineDesc pipe_desc{};
+        pipe_desc.layout = blur_layout.get();
+        pipe_desc.render_pass = temp_rp.get();
+
+        auto vs = device.create_shader_from_file("assets/shaders/deferred/vk_fullscreen.vert",
+                                                 rhi::ShaderStage::Vertex, "FullscreenVert");
+        auto fs = device.create_shader_from_file("assets/shaders/ssao_blur.frag",
+                                                 rhi::ShaderStage::Fragment, "SSAOBlurFrag");
+
+        if (vs && fs) {
+            pipe_desc.vertex_shader = vs.get();
+            pipe_desc.fragment_shader = fs.get();
+            pipe_desc.topology = rhi::PrimitiveTopology::TriangleList;
+            rhi::VertexInputLayout item_layout;
+            item_layout.bindings.push_back({0, 5 * sizeof(float), rhi::VertexInputRate::Vertex});
+            item_layout.attributes.push_back({0, 0, rhi::Format::RGB32_FLOAT, 0});
+            item_layout.attributes.push_back({1, 0, rhi::Format::RG32_FLOAT, 3 * sizeof(float)});
+            pipe_desc.vertex_layout = item_layout;
+
+            blur_pipeline = device.create_graphics_pipeline(pipe_desc);
+        }
+    }
+}
+
+void SSAOPass::destroy() {
+    color_texture.reset();
+    color_view.reset();
+    blur_texture.reset();
+    blur_view.reset();
+    noise_texture.reset();
+    noise_view.reset();
+    kernel_ubo.reset();
+    params_ubo.reset();
+    pipeline.reset();
+    pipeline_layout.reset();
+    descriptor_layout.reset();
+    descriptor_set.reset();
+    blur_pipeline.reset();
+    blur_layout.reset();
+    blur_descriptor_layout.reset();
+    blur_descriptor_set.reset();
+    descriptor_pool.reset();
+}
+
+void SSAOPass::execute(rhi::CommandList& cmd, rhi::Device& device, const Camera& camera,
+                       const rhi::Buffer& quad_vb, const rhi::DescriptorSet& camera_set,
+                       const rhi::DescriptorSet& gbuffer_set) {
+    if (!config.enabled || !pipeline || !blur_pipeline)
+        return;
+
+    // Update Params
+    {
+        SSAOConfig* mapped = (SSAOConfig*)params_ubo->map();
+        if (mapped) {
+            struct SSAOParams {
+                glm::vec2 noise_scale;
+                float radius;
+                float bias;
+                int kernel_size;
+                float power;
+                float padding[2];
+            } params;
+            params.noise_scale = glm::vec2(width / 4.0f, height / 4.0f);
+            params.radius = config.radius;
+            params.bias = config.bias;
+            params.kernel_size = config.kernel_size;
+            params.power = config.power;
+            memcpy(mapped, &params, sizeof(params));
+            params_ubo->unmap();
+        }
+    }
+
+    // SSAO Pass
+    {
+        rhi::RenderingInfo info{};
+        info.render_area = {0, 0, width, height};
+        rhi::RenderingAttachment ssao_att = {color_view.get(), nullptr, rhi::LoadOp::Clear,
+                                             rhi::StoreOp::Store, rhi::ClearColor::white()};
+        info.color_attachments = {&ssao_att, 1};
+
+        cmd.begin_rendering(info);
+        cmd.bind_pipeline(*pipeline);
+
+        cmd.bind_descriptor_set(*pipeline_layout, 0, camera_set);
+        cmd.bind_descriptor_set(*pipeline_layout, 1, gbuffer_set);
+        cmd.bind_descriptor_set(*pipeline_layout, 2, *descriptor_set);
+
+        cmd.bind_vertex_buffer(0, quad_vb);
+        cmd.draw(6, 1, 0, 0);
+
+        cmd.end_rendering();
+    }
+
+    // Blur Pass
+    {
+        rhi::TextureBarrier barrier{};
+        barrier.texture = color_texture.get();
+        barrier.old_state = rhi::ResourceState::RenderTarget;
+        barrier.new_state = rhi::ResourceState::ShaderResource;
+        cmd.barrier(barrier);
+
+        rhi::RenderingInfo blur_info{};
+        blur_info.render_area = {0, 0, width, height};
+        std::vector<rhi::RenderingAttachment> attachments;
+        attachments.push_back({blur_view.get(), nullptr, rhi::LoadOp::Clear, rhi::StoreOp::Store,
+                               rhi::ClearColor{0.0f, 0.0f, 0.0f, 0.0f}});
+        blur_info.color_attachments = attachments;
+
+        cmd.begin_rendering(blur_info);
+        cmd.bind_pipeline(*blur_pipeline);
+
+        cmd.bind_descriptor_set(*blur_layout, 0, *blur_descriptor_set);
+        cmd.bind_vertex_buffer(0, quad_vb);
+        cmd.draw(6, 1, 0, 0);
+        cmd.end_rendering();
+
+        rhi::TextureBarrier barrier2{};
+        barrier2.texture = blur_texture.get();
+        barrier2.old_state = rhi::ResourceState::RenderTarget;
+        barrier2.new_state = rhi::ResourceState::ShaderResource;
+        cmd.barrier(barrier2);
+    }
 }
 
 // ============================================================================
@@ -396,6 +687,9 @@ bool DeferredRenderer::init() {
 
     update_gbuffer_descriptor_set();
 
+    m_ssao.create(m_device, m_width, m_height, m_ssao.config, *m_camera_layout,
+                  *m_gbuffer_input_layout);
+
     m_initialized = true;
     HZ_LOG_INFO("Deferred Renderer Initialized (Vulkan Backed)");
     return true;
@@ -406,6 +700,7 @@ void DeferredRenderer::shutdown() {
     m_lighting_texture.reset();
     m_lighting_view.reset();
     m_csm.destroy();
+    m_ssao.destroy();
     m_ssr.destroy();
     m_taa.destroy();
     m_quad_vb.reset();
@@ -438,6 +733,10 @@ void DeferredRenderer::resize(u32 width, u32 height) {
 
     m_ssr.destroy();
     m_ssr.create(m_device, m_width / 2, m_height / 2, m_ssr.config);
+
+    m_ssao.destroy();
+    m_ssao.create(m_device, m_width, m_height, m_ssao.config, *m_camera_layout,
+                  *m_gbuffer_input_layout);
 
     m_taa.destroy();
     m_taa.create(m_device, m_width, m_height, m_taa.config);
@@ -537,6 +836,12 @@ void DeferredRenderer::begin_geometry_pass(rhi::CommandList& cmd, const Camera& 
 
     m_csm.update_cascades(camera, glm::vec3(0.0f, -1.0f, 0.0f),
                           aspect); // Update shadow cascades (placeholder light dir)
+}
+
+void DeferredRenderer::execute_ssao_pass(rhi::CommandList& cmd, const Camera& camera) {
+    if (!m_ssao.config.enabled || !m_quad_vb || !m_camera_set || !m_gbuffer_input_set)
+        return;
+    m_ssao.execute(cmd, m_device, camera, *m_quad_vb, *m_camera_set, *m_gbuffer_input_set);
 }
 
 void DeferredRenderer::end_geometry_pass(rhi::CommandList& cmd) {
@@ -656,7 +961,11 @@ void DeferredRenderer::execute_lighting_pass(
                       m_csm.cascades[2].split_depth, m_csm.cascades[3].split_depth);
         shadow_data.params = glm::vec4(1.0f, 0.005f, 0.0f, 0.0f); // Enabled, Bias
         m_shadow_ubo->upload(shadow_data);
+        m_shadow_ubo->upload(shadow_data);
     }
+
+    // 1.5 Execute SSAO
+    m_ssao.execute(cmd, m_device, camera, *m_quad_vb, *m_camera_set, *m_gbuffer_input_set);
 
     // 2. Transition Lighting Texture to RenderTarget
     {
@@ -784,6 +1093,9 @@ void DeferredRenderer::render_to_screen(rhi::CommandList& cmd) {
 
 void DeferredRenderer::set_csm_config(const CascadedShadowConfig& config) {
     m_csm.config = config;
+}
+void DeferredRenderer::set_ssao_config(const SSAOConfig& config) {
+    m_ssao.config = config;
 }
 void DeferredRenderer::set_ssr_config(const SSRConfig& config) {
     m_ssr.config = config;

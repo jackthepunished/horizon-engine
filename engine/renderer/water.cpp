@@ -26,7 +26,8 @@ void Water::create_mesh(rhi::Device& device) {
     for (int z = 0; z <= subdivisions; ++z) {
         for (int x = 0; x <= subdivisions; ++x) {
             WaterVertex v;
-            v.position = glm::vec3(-half_size + x * step, m_config.height, -half_size + z * step);
+            v.position = glm::vec3(-half_size + static_cast<float>(x) * step, m_config.height,
+                                   -half_size + static_cast<float>(z) * step);
             v.texcoord = glm::vec2(static_cast<float>(x) / static_cast<float>(subdivisions),
                                    static_cast<float>(z) / static_cast<float>(subdivisions));
             vertices.push_back(v);

@@ -188,7 +188,7 @@ TEST_CASE("HurtboxComponent::apply_damage basic", "[physics][hurtbox]") {
 
     SECTION("Damage that kills sets is_dead") {
         hurtbox.current_health = 20.0f;
-        hurtbox.apply_damage(50.0f, HitboxType::Torso, glm::vec3(0));
+        (void)hurtbox.apply_damage(50.0f, HitboxType::Torso, glm::vec3(0));
 
         REQUIRE(hurtbox.current_health <= 0.0f);
         REQUIRE(hurtbox.is_dead == true);
@@ -196,7 +196,7 @@ TEST_CASE("HurtboxComponent::apply_damage basic", "[physics][hurtbox]") {
 
     SECTION("Health clamps at zero") {
         hurtbox.current_health = 10.0f;
-        hurtbox.apply_damage(100.0f, HitboxType::Torso, glm::vec3(0));
+        (void)hurtbox.apply_damage(100.0f, HitboxType::Torso, glm::vec3(0));
 
         REQUIRE(hurtbox.current_health == Approx(0.0f));
     }
@@ -240,7 +240,7 @@ TEST_CASE("HurtboxComponent::apply_damage with armor", "[physics][hurtbox]") {
 
     SECTION("Armor depletes before health") {
         hurtbox.armor = 10.0f;
-        hurtbox.apply_damage(100.0f, HitboxType::Torso, glm::vec3(0));
+        (void)hurtbox.apply_damage(100.0f, HitboxType::Torso, glm::vec3(0));
 
         // Armor should be depleted
         REQUIRE(hurtbox.armor == Approx(0.0f));

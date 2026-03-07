@@ -79,7 +79,7 @@ struct AnimatorComponent {
 
         if (current_time >= current_clip->duration) {
             if (loop) {
-                current_time = fmod(current_time, current_clip->duration);
+                current_time = std::fmod(current_time, current_clip->duration);
             } else {
                 current_time = current_clip->duration;
                 state = AnimationState::Stopped;
