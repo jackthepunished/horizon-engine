@@ -331,10 +331,14 @@ void SSAOPass::create(rhi::Device& device, u32 w, u32 h, const SSAOConfig& cfg,
         descriptor_layout = device.create_descriptor_set_layout(desc);
     }
 
-    // Create Repeat Sampler
-    auto sampler = device.create_sampler({rhi::Filter::Nearest, rhi::Filter::Nearest,
-                                          rhi::MipmapMode::Nearest, rhi::AddressMode::Repeat,
-                                          rhi::AddressMode::Repeat, rhi::AddressMode::Repeat});
+    // Create samplers used by SSAO descriptor sets.
+    noise_sampler = device.create_sampler({rhi::Filter::Nearest, rhi::Filter::Nearest,
+                                           rhi::MipmapMode::Nearest, rhi::AddressMode::Repeat,
+                                           rhi::AddressMode::Repeat, rhi::AddressMode::Repeat});
+    blur_sampler = device.create_sampler({rhi::Filter::Linear, rhi::Filter::Linear,
+                                          rhi::MipmapMode::Linear, rhi::AddressMode::ClampToEdge,
+                                          rhi::AddressMode::ClampToEdge,
+                                          rhi::AddressMode::ClampToEdge});
 
     // 5. Descriptor Pool
     {
@@ -375,13 +379,14 @@ void SSAOPass::create(rhi::Device& device, u32 w, u32 h, const SSAOConfig& cfg,
             pipe_desc.vertex_shader = vs.get();
             pipe_desc.fragment_shader = fs.get();
             pipe_desc.topology = rhi::PrimitiveTopology::TriangleList;
+            pipe_desc.blend = rhi::BlendState::disabled(1);
             pipeline = device.create_graphics_pipeline(pipe_desc);
         }
 
         descriptor_set = descriptor_pool->allocate(*descriptor_layout);
         descriptor_set->write_buffer(0, *kernel_ubo);
         descriptor_set->write_buffer(1, *params_ubo);
-        descriptor_set->write_texture(2, *noise_view, *sampler);
+        descriptor_set->write_texture(2, *noise_view, *noise_sampler);
     }
 
     // 7. Blur Descriptors & Pipeline
@@ -394,11 +399,7 @@ void SSAOPass::create(rhi::Device& device, u32 w, u32 h, const SSAOConfig& cfg,
 
         blur_descriptor_set = descriptor_pool->allocate(*blur_descriptor_layout);
 
-        auto linear_sampler =
-            device.create_sampler({rhi::Filter::Linear, rhi::Filter::Linear,
-                                   rhi::MipmapMode::Linear, rhi::AddressMode::ClampToEdge,
-                                   rhi::AddressMode::ClampToEdge, rhi::AddressMode::ClampToEdge});
-        blur_descriptor_set->write_texture(0, *color_view, *linear_sampler);
+        blur_descriptor_set->write_texture(0, *color_view, *blur_sampler);
 
         // Pipeline Layout
         rhi::PipelineLayoutDesc pl_desc{};
@@ -422,6 +423,7 @@ void SSAOPass::create(rhi::Device& device, u32 w, u32 h, const SSAOConfig& cfg,
             pipe_desc.vertex_shader = vs.get();
             pipe_desc.fragment_shader = fs.get();
             pipe_desc.topology = rhi::PrimitiveTopology::TriangleList;
+            pipe_desc.blend = rhi::BlendState::disabled(1);
             rhi::VertexInputLayout item_layout;
             item_layout.bindings.push_back({0, 5 * sizeof(float), rhi::VertexInputRate::Vertex});
             item_layout.attributes.push_back({0, 0, rhi::Format::RGB32_FLOAT, 0});
@@ -431,6 +433,9 @@ void SSAOPass::create(rhi::Device& device, u32 w, u32 h, const SSAOConfig& cfg,
             blur_pipeline = device.create_graphics_pipeline(pipe_desc);
         }
     }
+
+    raw_state = rhi::ResourceState::Undefined;
+    blur_state = rhi::ResourceState::Undefined;
 }
 
 void SSAOPass::destroy() {
@@ -440,6 +445,8 @@ void SSAOPass::destroy() {
     blur_view.reset();
     noise_texture.reset();
     noise_view.reset();
+    noise_sampler.reset();
+    blur_sampler.reset();
     kernel_ubo.reset();
     params_ubo.reset();
     pipeline.reset();
@@ -451,6 +458,8 @@ void SSAOPass::destroy() {
     blur_descriptor_layout.reset();
     blur_descriptor_set.reset();
     descriptor_pool.reset();
+    raw_state = rhi::ResourceState::Undefined;
+    blur_state = rhi::ResourceState::Undefined;
 }
 
 void SSAOPass::execute(rhi::CommandList& cmd, rhi::Device& device, const Camera& camera,
@@ -459,30 +468,39 @@ void SSAOPass::execute(rhi::CommandList& cmd, rhi::Device& device, const Camera&
     if (!config.enabled || !pipeline || !blur_pipeline)
         return;
 
+    struct SSAOParams {
+        glm::vec2 noise_scale;
+        float radius;
+        float bias;
+        int kernel_size;
+        float power;
+        float padding[2];
+    };
+
     // Update Params
     {
-        SSAOConfig* mapped = (SSAOConfig*)params_ubo->map();
+        auto* mapped = reinterpret_cast<SSAOParams*>(params_ubo->map());
         if (mapped) {
-            struct SSAOParams {
-                glm::vec2 noise_scale;
-                float radius;
-                float bias;
-                int kernel_size;
-                float power;
-                float padding[2];
-            } params;
+            SSAOParams params{};
             params.noise_scale = glm::vec2(width / 4.0f, height / 4.0f);
             params.radius = config.radius;
             params.bias = config.bias;
             params.kernel_size = config.kernel_size;
             params.power = config.power;
-            memcpy(mapped, &params, sizeof(params));
+            *mapped = params;
             params_ubo->unmap();
         }
     }
 
     // SSAO Pass
     {
+        rhi::TextureBarrier raw_to_rt{};
+        raw_to_rt.texture = color_texture.get();
+        raw_to_rt.old_state = raw_state;
+        raw_to_rt.new_state = rhi::ResourceState::RenderTarget;
+        cmd.barrier(raw_to_rt);
+        raw_state = rhi::ResourceState::RenderTarget;
+
         rhi::RenderingInfo info{};
         info.render_area = {0, 0, width, height};
         rhi::RenderingAttachment ssao_att = {color_view.get(), nullptr, rhi::LoadOp::Clear,
@@ -506,9 +524,17 @@ void SSAOPass::execute(rhi::CommandList& cmd, rhi::Device& device, const Camera&
     {
         rhi::TextureBarrier barrier{};
         barrier.texture = color_texture.get();
-        barrier.old_state = rhi::ResourceState::RenderTarget;
+        barrier.old_state = raw_state;
         barrier.new_state = rhi::ResourceState::ShaderResource;
         cmd.barrier(barrier);
+        raw_state = rhi::ResourceState::ShaderResource;
+
+        rhi::TextureBarrier blur_to_rt{};
+        blur_to_rt.texture = blur_texture.get();
+        blur_to_rt.old_state = blur_state;
+        blur_to_rt.new_state = rhi::ResourceState::RenderTarget;
+        cmd.barrier(blur_to_rt);
+        blur_state = rhi::ResourceState::RenderTarget;
 
         rhi::RenderingInfo blur_info{};
         blur_info.render_area = {0, 0, width, height};
@@ -527,9 +553,10 @@ void SSAOPass::execute(rhi::CommandList& cmd, rhi::Device& device, const Camera&
 
         rhi::TextureBarrier barrier2{};
         barrier2.texture = blur_texture.get();
-        barrier2.old_state = rhi::ResourceState::RenderTarget;
+        barrier2.old_state = blur_state;
         barrier2.new_state = rhi::ResourceState::ShaderResource;
         cmd.barrier(barrier2);
+        blur_state = rhi::ResourceState::ShaderResource;
     }
 }
 
