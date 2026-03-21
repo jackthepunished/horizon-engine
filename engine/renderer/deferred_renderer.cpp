@@ -311,8 +311,8 @@ void SSAOPass::create(rhi::Device& device, u32 w, u32 h, const SSAOConfig& cfg,
         desc.debug_name = "SSAO Noise";
         noise_texture = device.create_texture(desc);
         noise_view = device.create_texture_view(*noise_texture);
-
-        // TODO: Upload noise data via staging buffer and command list.
+        device.update_texture(*noise_texture, noise.data(),
+                              static_cast<u64>(noise.size() * sizeof(glm::vec4)));
     }
 
     params_ubo = device.create_buffer(
