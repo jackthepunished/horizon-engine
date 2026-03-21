@@ -133,8 +133,63 @@ private:
 };
 
 // ============================================================================
-// Screen Space Reflections
+// Screen Space Ambient Occlusion
 // ============================================================================
+
+struct SSAOConfig {
+    bool enabled{true};
+    int kernel_size{64};
+    float radius{0.5f};
+    float bias{0.025f};
+    float power{2.0f};            // Contrast power
+    float resolution_scale{0.5f}; // Render at half resolution for performance
+};
+
+struct SSAOPass {
+    std::unique_ptr<rhi::Framebuffer> fbo;
+    std::unique_ptr<rhi::Texture> color_texture; // Raw SSAO
+    std::unique_ptr<rhi::TextureView> color_view;
+
+    std::unique_ptr<rhi::Framebuffer> blur_fbo;
+    std::unique_ptr<rhi::Texture> blur_texture; // Blurred output
+    std::unique_ptr<rhi::TextureView> blur_view;
+
+    std::unique_ptr<rhi::Texture> noise_texture;
+    std::unique_ptr<rhi::TextureView> noise_view;
+    std::unique_ptr<rhi::Sampler> noise_sampler;
+    std::unique_ptr<rhi::Sampler> blur_sampler;
+
+    std::unique_ptr<rhi::Buffer> kernel_ubo;
+    std::unique_ptr<rhi::Buffer> params_ubo;
+
+    std::unique_ptr<rhi::DescriptorPool> descriptor_pool;
+
+    // SSAO Generation Pipeline
+    std::unique_ptr<rhi::Pipeline> pipeline;
+    std::unique_ptr<rhi::PipelineLayout> pipeline_layout;
+    std::unique_ptr<rhi::DescriptorSetLayout> descriptor_layout;
+    std::unique_ptr<rhi::DescriptorSet> descriptor_set;
+
+    // Blur Pipeline
+    std::unique_ptr<rhi::Pipeline> blur_pipeline;
+    std::unique_ptr<rhi::PipelineLayout> blur_layout;
+    std::unique_ptr<rhi::DescriptorSetLayout> blur_descriptor_layout;
+    std::unique_ptr<rhi::DescriptorSet> blur_descriptor_set;
+
+    SSAOConfig config;
+    u32 width{0};
+    u32 height{0};
+    rhi::ResourceState raw_state{rhi::ResourceState::Undefined};
+    rhi::ResourceState blur_state{rhi::ResourceState::Undefined};
+
+    void create(rhi::Device& device, u32 w, u32 h, const SSAOConfig& cfg,
+                const rhi::DescriptorSetLayout& camera_layout,
+                const rhi::DescriptorSetLayout& gbuffer_layout);
+    void destroy();
+    void execute(rhi::CommandList& cmd, rhi::Device& device, const Camera& camera,
+                 const rhi::Buffer& quad_vb, const rhi::DescriptorSet& camera_set,
+                 const rhi::DescriptorSet& gbuffer_set);
+};
 
 struct SSRConfig {
     f32 max_distance{50.0f};
@@ -299,6 +354,8 @@ public:
 
     void execute_ssr_pass(rhi::CommandList& cmd, const Camera& camera);
 
+    void execute_ssao_pass(rhi::CommandList& cmd, const Camera& camera);
+
     void execute_taa_pass(rhi::CommandList& cmd);
 
     [[nodiscard]] glm::mat4 get_taa_jittered_projection(const glm::mat4& proj) const {
@@ -315,10 +372,15 @@ public:
     // =========================================================================
 
     void set_csm_config(const CascadedShadowConfig& config);
+    void set_ssao_config(const SSAOConfig& config);
     void set_ssr_config(const SSRConfig& config);
     void set_taa_config(const TAAConfig& config);
 
     [[nodiscard]] const CascadedShadowConfig& get_csm_config() const { return m_csm.config; }
+    [[nodiscard]] const SSAOConfig& get_ssao_config() const { return m_ssao.config; }
+    [[nodiscard]] const SSRPass& get_ssr_pass() const {
+        return m_ssr;
+    } // Wait, original was get_ssr_config
     [[nodiscard]] const SSRConfig& get_ssr_config() const { return m_ssr.config; }
     [[nodiscard]] const TAAConfig& get_taa_config() const { return m_taa.config; }
 
@@ -376,6 +438,7 @@ private:
     // Pipeline stages
     GBuffer m_gbuffer;
     CascadedShadowMap m_csm;
+    SSAOPass m_ssao;
     SSRPass m_ssr;
     TAAPass m_taa;
 
