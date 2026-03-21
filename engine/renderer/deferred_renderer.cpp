@@ -964,9 +964,6 @@ void DeferredRenderer::execute_lighting_pass(
         m_shadow_ubo->upload(shadow_data);
     }
 
-    // 1.5 Execute SSAO
-    m_ssao.execute(cmd, m_device, camera, *m_quad_vb, *m_camera_set, *m_gbuffer_input_set);
-
     // 2. Transition Lighting Texture to RenderTarget
     {
         rhi::TextureBarrier b;
