@@ -23,8 +23,8 @@ namespace hz {
  * @brief Options for shader compilation
  */
 struct ShaderCompileOptions {
-    std::string_view source;   ///< GLSL source code
-    std::string_view filename; ///< Filename for error messages (can be empty)
+    std::string_view source; ///< GLSL source code
+    std::string filename;    ///< Filename for error messages (can be empty)
     rhi::ShaderStage stage{rhi::ShaderStage::None};
 
     /// Macro definitions: {name, value} pairs

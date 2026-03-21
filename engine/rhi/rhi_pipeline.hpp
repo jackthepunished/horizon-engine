@@ -550,6 +550,11 @@ struct GraphicsPipelineDesc {
     const RenderPass* render_pass{nullptr};
     u32 subpass{0};
 
+    // Dynamic rendering (VK_KHR_dynamic_rendering): used when render_pass is nullptr.
+    // Specify the attachment formats so the pipeline is compatible with vkCmdBeginRendering.
+    std::vector<Format> color_attachment_formats;
+    Format depth_attachment_format{Format::Unknown};
+
     const char* debug_name{nullptr};
 };
 

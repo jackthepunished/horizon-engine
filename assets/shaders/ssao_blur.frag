@@ -1,16 +1,15 @@
-#version 410 core
+#version 450 core
 
-out float g_occlusion;
+layout(location = 0) in vec2 v_texcoord;
+layout(location = 0) out float g_occlusion;
 
-in vec2 v_texcoord;
-
-uniform sampler2D u_ssao_input;
+layout(set = 0, binding = 0) uniform sampler2D u_ssao_input;
 
 void main() {
     float result = 0.0;
     vec2 texel_size = 1.0 / vec2(textureSize(u_ssao_input, 0));
     
-    // 4x4 Box Blur
+    // 4x4 Box Blur (Simple)
     for (int x = -2; x < 2; ++x) {
         for (int y = -2; y < 2; ++y) {
             vec2 offset = vec2(float(x), float(y)) * texel_size;
@@ -18,5 +17,5 @@ void main() {
         }
     }
     
-    g_occlusion = result / (4.0 * 4.0);
+    g_occlusion = result / 16.0;
 }
