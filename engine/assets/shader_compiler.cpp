@@ -5,11 +5,34 @@
 #include <fstream>
 #include <sstream>
 
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
 #ifdef HZ_VULKAN_BACKEND
 #include <shaderc/shaderc.hpp>
 #endif
 
 namespace hz {
+
+// Safe path-to-string conversion that avoids MinGW's broken narrow locale
+// conversion (which throws "Illegal byte sequence" on Turkish Windows etc.)
+static std::string path_to_string(const std::filesystem::path& p) {
+#ifdef _WIN32
+    // On Windows, go through wide string -> narrow via WideCharToMultiByte CP_UTF8
+    const auto& ws = p.native(); // returns const wstring& on Windows
+    if (ws.empty())
+        return {};
+    int size_needed = WideCharToMultiByte(CP_UTF8, 0, ws.data(), static_cast<int>(ws.size()),
+                                          nullptr, 0, nullptr, nullptr);
+    std::string result(static_cast<size_t>(size_needed), '\0');
+    WideCharToMultiByte(CP_UTF8, 0, ws.data(), static_cast<int>(ws.size()), result.data(),
+                        size_needed, nullptr, nullptr);
+    return result;
+#else
+    return p.string();
+#endif
+}
 
 namespace {
 
@@ -65,7 +88,7 @@ public:
         // Read the file
         std::ifstream file(resolved_path, std::ios::binary | std::ios::ate);
         if (!file) {
-            std::string error_msg = "Could not open include file: " + resolved_path.string();
+            std::string error_msg = "Could not open include file: " + path_to_string(resolved_path);
             auto* error_data = new std::string(std::move(error_msg));
             result->source_name = "";
             result->source_name_length = 0;
@@ -82,7 +105,7 @@ public:
         content->resize(static_cast<size_t>(size));
         file.read(content->data(), size);
 
-        auto* name = new std::string(resolved_path.string());
+        auto* name = new std::string(path_to_string(resolved_path));
 
         result->source_name = name->c_str();
         result->source_name_length = name->size();
@@ -232,7 +255,7 @@ ShaderCompileResult ShaderCompiler::compile_file(const std::filesystem::path& pa
     // Read the file
     std::ifstream file(path, std::ios::binary | std::ios::ate);
     if (!file) {
-        result.error_message = "Could not open shader file: " + path.string();
+        result.error_message = "Could not open shader file: " + path_to_string(path);
         HZ_LOG_ERROR("{}", result.error_message);
         return result;
     }
@@ -248,7 +271,8 @@ ShaderCompileResult ShaderCompiler::compile_file(const std::filesystem::path& pa
     if (stage == rhi::ShaderStage::None) {
         stage = infer_stage_from_extension(path);
         if (stage == rhi::ShaderStage::None) {
-            result.error_message = "Could not infer shader stage from extension: " + path.string();
+            result.error_message =
+                "Could not infer shader stage from extension: " + path_to_string(path);
             HZ_LOG_ERROR("{}", result.error_message);
             return result;
         }
@@ -257,7 +281,7 @@ ShaderCompileResult ShaderCompiler::compile_file(const std::filesystem::path& pa
     // Set up compilation options
     ShaderCompileOptions options;
     options.source = source;
-    options.filename = path.string();
+    options.filename = path_to_string(path);
     options.stage = stage;
 
     // Add common include paths

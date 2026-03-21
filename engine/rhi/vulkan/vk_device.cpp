@@ -690,6 +690,13 @@ void VulkanDevice::end_frame() {
     // Reset fence for next use
     vkResetFences(m_device, 1, &frame.in_flight_fence);
 
+    // Signal the frame fence after all previously queued graphics work completes.
+    // This keeps begin_frame()/end_frame() synchronization valid even if callers
+    // submit their own per-frame fences through the higher-level RHI API.
+    VkSubmitInfo empty_submit{};
+    empty_submit.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    VK_CHECK(vkQueueSubmit(m_graphics_queue, 1, &empty_submit, frame.in_flight_fence));
+
     // Advance frame
     m_current_frame = (m_current_frame + 1) % MAX_FRAMES_IN_FLIGHT;
     ++m_frame_number;

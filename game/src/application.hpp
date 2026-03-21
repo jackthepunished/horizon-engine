@@ -15,6 +15,7 @@
 #include <array>
 #include <memory>
 #include <optional>
+#include <vector>
 
 #include <engine/assets/asset_registry.hpp>
 #include <engine/assets/model.hpp>
@@ -120,7 +121,7 @@ private:
     unsigned int m_current_frame = 0;
 
     std::array<std::unique_ptr<hz::rhi::Semaphore>, 2> m_image_available_sems;
-    std::array<std::unique_ptr<hz::rhi::Semaphore>, 2> m_render_finished_sems;
+    std::vector<std::unique_ptr<hz::rhi::Semaphore>> m_render_finished_sems;
     std::array<std::unique_ptr<hz::rhi::Fence>, 2> m_frame_fences;
 
     // Previous frame data for TAA

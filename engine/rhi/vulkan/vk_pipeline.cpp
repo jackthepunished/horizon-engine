@@ -424,6 +424,10 @@ VulkanPipeline::VulkanPipeline(VulkanDevice& device, const GraphicsPipelineDesc&
     dynamic_state.dynamicStateCount = static_cast<u32>(dynamic_states.size());
     dynamic_state.pDynamicStates = dynamic_states.empty() ? nullptr : dynamic_states.data();
 
+    // Dynamic rendering support (VK_KHR_dynamic_rendering / Vulkan 1.3)
+    VkPipelineRenderingCreateInfo rendering_info{};
+    std::vector<VkFormat> vk_color_formats;
+
     // Create pipeline
     VkGraphicsPipelineCreateInfo pipeline_info{};
     pipeline_info.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
@@ -438,9 +442,27 @@ VulkanPipeline::VulkanPipeline(VulkanDevice& device, const GraphicsPipelineDesc&
     pipeline_info.pColorBlendState = &color_blend;
     pipeline_info.pDynamicState = dynamic_states.empty() ? nullptr : &dynamic_state;
     pipeline_info.layout = m_layout->layout();
-    pipeline_info.renderPass =
-        static_cast<const VulkanRenderPass*>(desc.render_pass)->render_pass();
-    pipeline_info.subpass = desc.subpass;
+
+    if (desc.render_pass) {
+        pipeline_info.renderPass =
+            static_cast<const VulkanRenderPass*>(desc.render_pass)->render_pass();
+        pipeline_info.subpass = desc.subpass;
+    } else {
+        for (auto fmt : desc.color_attachment_formats) {
+            vk_color_formats.push_back(to_vk_format(fmt));
+        }
+        rendering_info.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO;
+        rendering_info.colorAttachmentCount = static_cast<u32>(vk_color_formats.size());
+        rendering_info.pColorAttachmentFormats = vk_color_formats.data();
+        rendering_info.depthAttachmentFormat =
+            desc.depth_attachment_format != Format::Unknown
+                ? to_vk_format(desc.depth_attachment_format)
+                : VK_FORMAT_UNDEFINED;
+        rendering_info.stencilAttachmentFormat = VK_FORMAT_UNDEFINED;
+
+        pipeline_info.renderPass = VK_NULL_HANDLE;
+        pipeline_info.pNext = &rendering_info;
+    }
 
     VkResult result = vkCreateGraphicsPipelines(m_device.device(), VK_NULL_HANDLE, 1,
                                                 &pipeline_info, nullptr, &m_pipeline);

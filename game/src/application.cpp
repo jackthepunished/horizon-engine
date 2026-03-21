@@ -97,8 +97,12 @@ bool Application::init_renderer() {
     // 4. Initialize Synchronization primitives
     for (unsigned int i = 0; i < APP_MAX_FRAMES_IN_FLIGHT; ++i) {
         m_image_available_sems[i] = m_device->create_semaphore();
-        m_render_finished_sems[i] = m_device->create_semaphore();
         m_frame_fences[i] = m_device->create_fence(true); // Signaled initially
+    }
+    m_render_finished_sems.clear();
+    m_render_finished_sems.reserve(m_swapchain->image_count());
+    for (hz::u32 i = 0; i < m_swapchain->image_count(); ++i) {
+        m_render_finished_sems.push_back(m_device->create_semaphore());
     }
 
     return true;
@@ -157,8 +161,7 @@ void Application::load_assets() {
     // Albedo (White)
     {
         hz::u8 data[4] = {200, 200, 200, 255};
-        hz::Texture tex;
-        tex.create(1, 1, hz::TextureFormat::RGBA8, data);
+        hz::Texture tex = hz::Texture::create(1, 1, hz::TextureFormat::RGBA8, data);
         tex.upload_to_gpu(*m_device);
         m_albedo_handle = m_assets->register_texture(std::move(tex), "default_albedo");
     }
@@ -166,8 +169,7 @@ void Application::load_assets() {
     // Normal (Flat Z+)
     {
         hz::u8 data[4] = {128, 128, 255, 255};
-        hz::Texture tex;
-        tex.create(1, 1, hz::TextureFormat::RGBA8, data);
+        hz::Texture tex = hz::Texture::create(1, 1, hz::TextureFormat::RGBA8, data);
         tex.upload_to_gpu(*m_device);
         m_normal_handle = m_assets->register_texture(std::move(tex), "default_normal");
     }
@@ -175,8 +177,7 @@ void Application::load_assets() {
     // ARM (AO=1, Roughness=0.8, Metallic=0.0) -> Plastic-like
     {
         hz::u8 data[4] = {255, 204, 0, 255};
-        hz::Texture tex;
-        tex.create(1, 1, hz::TextureFormat::RGBA8, data);
+        hz::Texture tex = hz::Texture::create(1, 1, hz::TextureFormat::RGBA8, data);
         tex.upload_to_gpu(*m_device);
         m_arm_handle = m_assets->register_texture(std::move(tex), "default_arm");
     }
@@ -339,7 +340,6 @@ void Application::on_render([[maybe_unused]] float alpha) {
 
     hz::rhi::Fence* fences[] = {m_frame_fences[m_current_frame].get()};
     m_device->wait_fences(fences);
-    m_device->reset_fences(fences);
 
     // Camera & Light setup
     std::vector<hz::GPUPointLight> point_lights;
@@ -370,15 +370,29 @@ void Application::on_render([[maybe_unused]] float alpha) {
             m_device->wait_idle();
             m_swapchain->resize(width, height);
             m_renderer->resize(width, height);
+            m_render_finished_sems.clear();
+            m_render_finished_sems.reserve(m_swapchain->image_count());
+            for (hz::u32 i = 0; i < m_swapchain->image_count(); ++i) {
+                m_render_finished_sems.push_back(m_device->create_semaphore());
+            }
         }
+        m_device->end_frame();
+        return;
+    }
+
+    const hz::u32 image_index = m_swapchain->current_image_index();
+    if (image_index >= m_render_finished_sems.size() || !m_render_finished_sems[image_index]) {
+        HZ_LOG_ERROR("Invalid swapchain image index for render semaphore: {}", image_index);
         m_device->end_frame();
         return;
     }
 
     // 2. Get Command List
     auto cmd = m_device->create_command_list(hz::rhi::QueueType::Graphics);
-    if (!cmd)
+    if (!cmd) {
+        m_device->end_frame();
         return;
+    }
 
     cmd->begin();
 
@@ -453,6 +467,9 @@ void Application::on_render([[maybe_unused]] float alpha) {
 
     m_renderer->end_geometry_pass(*cmd);
 
+    // === SSAO Pass ===
+    m_renderer->execute_ssao_pass(*cmd, camera);
+
     // === Lighting Pass ===
     m_renderer->execute_lighting_pass(*cmd, camera, point_lights, spot_lights, sun_dir, sun_color);
 
@@ -478,16 +495,17 @@ void Application::on_render([[maybe_unused]] float alpha) {
     submit_info.command_lists = {&cmd_ptr, 1};
 
     hz::rhi::Semaphore* wait_sems[] = {m_image_available_sems[m_current_frame].get()};
-    hz::rhi::Semaphore* signal_sems[] = {m_render_finished_sems[m_current_frame].get()};
+    hz::rhi::Semaphore* signal_sems[] = {m_render_finished_sems[image_index].get()};
 
     submit_info.wait_semaphores = wait_sems;
     submit_info.signal_semaphores = signal_sems;
     submit_info.signal_fence = m_frame_fences[m_current_frame].get();
 
+    m_device->reset_fences(fences);
     m_device->submit(hz::rhi::QueueType::Graphics, {&submit_info, 1});
 
     // 4. Present
-    hz::rhi::Semaphore* present_wait_sems[] = {m_render_finished_sems[m_current_frame].get()};
+    hz::rhi::Semaphore* present_wait_sems[] = {m_render_finished_sems[image_index].get()};
     m_swapchain->present(present_wait_sems);
 
     m_device->end_frame();

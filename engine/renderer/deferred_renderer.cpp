@@ -356,13 +356,9 @@ void SSAOPass::create(rhi::Device& device, u32 w, u32 h, const SSAOConfig& cfg,
         pl_desc.set_layouts = {&camera_layout, &gbuffer_layout, descriptor_layout.get()};
         pipeline_layout = device.create_pipeline_layout(pl_desc);
 
-        // Create Pipeline (using temp RenderPass for compatibility)
-        auto rp_desc = rhi::RenderPassDesc::simple(rhi::Format::R8_UNORM);
-        auto temp_rp = device.create_render_pass(rp_desc);
-
         rhi::GraphicsPipelineDesc pipe_desc{};
         pipe_desc.layout = pipeline_layout.get();
-        pipe_desc.render_pass = temp_rp.get();
+        pipe_desc.color_attachment_formats = {rhi::Format::R8_UNORM};
 
         rhi::VertexInputLayout item_layout;
         item_layout.bindings.push_back({0, 5 * sizeof(float), rhi::VertexInputRate::Vertex});
@@ -406,13 +402,9 @@ void SSAOPass::create(rhi::Device& device, u32 w, u32 h, const SSAOConfig& cfg,
         pl_desc.set_layouts = {blur_descriptor_layout.get()};
         blur_layout = device.create_pipeline_layout(pl_desc);
 
-        // Pipeline
-        auto rp_desc = rhi::RenderPassDesc::simple(rhi::Format::R8_UNORM);
-        auto temp_rp = device.create_render_pass(rp_desc);
-
         rhi::GraphicsPipelineDesc pipe_desc{};
         pipe_desc.layout = blur_layout.get();
-        pipe_desc.render_pass = temp_rp.get();
+        pipe_desc.color_attachment_formats = {rhi::Format::R8_UNORM};
 
         auto vs = device.create_shader_from_file("assets/shaders/deferred/vk_fullscreen.vert",
                                                  rhi::ShaderStage::Vertex, "FullscreenVert");
@@ -1303,7 +1295,10 @@ void DeferredRenderer::create_pipelines() {
         desc.blend = rhi::BlendState::disabled(4);
         desc.multisample = {};
         desc.layout = m_geometry_layout.get();
-        desc.render_pass = m_geometry_pass.get();
+        desc.color_attachment_formats = {
+            rhi::Format::RGBA16_FLOAT, rhi::Format::RGBA16_FLOAT,
+            rhi::Format::RGBA16_FLOAT, rhi::Format::RG16_FLOAT};
+        desc.depth_attachment_format = rhi::Format::D32_FLOAT;
         m_geometry_pipeline = m_device.create_graphics_pipeline(desc);
     }
 
@@ -1321,7 +1316,7 @@ void DeferredRenderer::create_pipelines() {
         desc.blend = rhi::BlendState::disabled(1);
         desc.multisample = {};
         desc.layout = m_lighting_layout.get();
-        desc.render_pass = m_lighting_pass.get();
+        desc.color_attachment_formats = {rhi::Format::RGBA16_FLOAT};
         m_lighting_pipeline = m_device.create_graphics_pipeline(desc);
     }
 
@@ -1339,7 +1334,7 @@ void DeferredRenderer::create_pipelines() {
         desc.blend = rhi::BlendState::disabled(1);
         desc.multisample = {};
         desc.layout = m_composite_layout.get();
-        desc.render_pass = m_composite_pass.get();
+        desc.color_attachment_formats = {m_swapchain.format()};
         m_composite_pipeline = m_device.create_graphics_pipeline(desc);
     }
 
@@ -1356,7 +1351,7 @@ void DeferredRenderer::create_pipelines() {
         desc.blend = rhi::BlendState::disabled(0);
         desc.multisample = {};
         desc.layout = m_shadow_layout.get();
-        desc.render_pass = m_shadow_pass.get();
+        desc.depth_attachment_format = rhi::Format::D32_FLOAT;
         m_shadow_pipeline = m_device.create_graphics_pipeline(desc);
     }
 
@@ -1386,6 +1381,10 @@ void DeferredRenderer::create_pipelines() {
     m_light_ubo =
         m_device.create_uniform_buffer(sizeof(glm::vec4) * 2 + sizeof(glm::uvec4), "LightUBO");
     m_shadow_ubo = m_device.create_uniform_buffer(sizeof(DeferredShadowUBO), "ShadowUBO");
+
+    if (m_camera_set && m_camera_ubo) {
+        m_camera_set->write_buffer(0, *m_camera_ubo);
+    }
 
     // Create samplers
     {
