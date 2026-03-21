@@ -669,7 +669,7 @@ bool DeferredRenderer::init() {
     m_height = m_swapchain.height();
 
     create_fullscreen_quad();
-    create_pipelines(); // Need to implement this
+    create_pipelines();
 
     m_gbuffer.create(m_device, m_width, m_height);
 
@@ -859,8 +859,7 @@ void DeferredRenderer::begin_geometry_pass(rhi::CommandList& cmd, const Camera& 
     // 5. Bind Camera Descriptor Set
     cmd.bind_descriptor_set(*m_geometry_layout, 0, *m_camera_set);
 
-    m_csm.update_cascades(camera, glm::vec3(0.0f, -1.0f, 0.0f),
-                          aspect); // Update shadow cascades (placeholder light dir)
+    m_csm.update_cascades(camera, glm::vec3(0.0f, -1.0f, 0.0f), aspect);
 }
 
 void DeferredRenderer::execute_ssao_pass(rhi::CommandList& cmd, const Camera& camera) {
@@ -985,7 +984,6 @@ void DeferredRenderer::execute_lighting_pass(
             glm::vec4(m_csm.cascades[0].split_depth, m_csm.cascades[1].split_depth,
                       m_csm.cascades[2].split_depth, m_csm.cascades[3].split_depth);
         shadow_data.params = glm::vec4(1.0f, 0.005f, 0.0f, 0.0f); // Enabled, Bias
-        m_shadow_ubo->upload(shadow_data);
         m_shadow_ubo->upload(shadow_data);
     }
 
