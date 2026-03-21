@@ -25,6 +25,7 @@ layout(set = 1, binding = 1) uniform sampler2D u_GBufNormalRoughness;
 layout(set = 1, binding = 2) uniform sampler2D u_GBufEmissionID;
 layout(set = 1, binding = 3) uniform sampler2D u_GBufDepth;
 layout(set = 1, binding = 4) uniform sampler2DArray u_ShadowMap;
+layout(set = 1, binding = 5) uniform sampler2D u_SSAOTexture;
 
 // Light data (set 2)
 layout(set = 2, binding = 0) uniform LightUBO {
@@ -259,8 +260,9 @@ void main() {
                              albedo, metallic, roughness, F0);
     }
 
-    // Ambient approximation (very simple; would be replaced by IBL/SSAO later)
+    // Ambient approximation with SSAO modulation.
     vec3 ambient = vec3(0.03) * albedo * ao;
+    ambient *= texture(u_SSAOTexture, v_TexCoord).r;
 
     vec3 color = ambient + Lo + emission;
 

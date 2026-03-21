@@ -685,10 +685,9 @@ bool DeferredRenderer::init() {
         }
     }
 
-    update_gbuffer_descriptor_set();
-
     m_ssao.create(m_device, m_width, m_height, m_ssao.config, *m_camera_layout,
                   *m_gbuffer_input_layout);
+    update_gbuffer_descriptor_set();
 
     m_initialized = true;
     HZ_LOG_INFO("Deferred Renderer Initialized (Vulkan Backed)");
@@ -715,8 +714,6 @@ void DeferredRenderer::resize(u32 width, u32 height) {
 
     m_gbuffer.destroy();
     m_gbuffer.create(m_device, m_width, m_height);
-    update_gbuffer_descriptor_set();
-
     m_lighting_texture.reset();
     m_lighting_view.reset();
     {
@@ -737,6 +734,7 @@ void DeferredRenderer::resize(u32 width, u32 height) {
     m_ssao.destroy();
     m_ssao.create(m_device, m_width, m_height, m_ssao.config, *m_camera_layout,
                   *m_gbuffer_input_layout);
+    update_gbuffer_descriptor_set();
 
     m_taa.destroy();
     m_taa.create(m_device, m_width, m_height, m_taa.config);
@@ -1147,6 +1145,8 @@ void DeferredRenderer::create_pipelines() {
             rhi::DescriptorBinding::combined_image_sampler(3, rhi::ShaderStage::Fragment));
         desc.bindings.push_back(
             rhi::DescriptorBinding::combined_image_sampler(4, rhi::ShaderStage::Fragment));
+        desc.bindings.push_back(
+            rhi::DescriptorBinding::combined_image_sampler(5, rhi::ShaderStage::Fragment));
         m_gbuffer_input_layout = m_device.create_descriptor_set_layout(desc);
     }
 
@@ -1412,6 +1412,10 @@ void DeferredRenderer::update_gbuffer_descriptor_set() {
 
     if (m_csm.depth_array_view && m_shadow_sampler) {
         m_gbuffer_input_set->write_texture(4, *m_csm.depth_array_view, *m_shadow_sampler);
+    }
+
+    if (m_ssao.blur_view) {
+        m_gbuffer_input_set->write_texture(5, *m_ssao.blur_view, *m_nearest_sampler);
     }
 }
 
