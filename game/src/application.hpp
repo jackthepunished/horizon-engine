@@ -5,7 +5,9 @@
  * @brief Main application class that orchestrates all game systems
  */
 
+#include "editor_ui.hpp"
 #include "game_config.hpp"
+#include "scene_settings.hpp"
 #include "systems/animation_system.hpp"
 #include "systems/character_system.hpp"
 #include "systems/lifetime_system.hpp"
@@ -109,6 +111,12 @@ private:
 
     // Default Material Set
     std::unique_ptr<hz::rhi::DescriptorSet> m_default_material_set;
+
+    // Editor
+    EditorUI m_editor;
+    SceneSettings m_scene_settings;
+    bool m_show_editor{true};
+    bool m_f1_held{false};
 
     // UI state
     bool m_show_grid{false};

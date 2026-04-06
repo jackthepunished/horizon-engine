@@ -66,6 +66,9 @@ bool Application::init_window() {
     m_imgui = std::make_unique<hz::ImGuiLayer>();
     m_imgui->init(*m_window);
 
+    // Apply professional dark editor theme
+    EditorUI::apply_dark_theme();
+
     return true;
 }
 
@@ -211,6 +214,7 @@ void Application::setup_scene_entities() {
     // Player
     auto player_entity = m_scene->create_entity();
     {
+        m_scene->registry().emplace<hz::TagComponent>(player_entity, "Player Camera");
         auto& tc = m_scene->registry().emplace<hz::TransformComponent>(player_entity);
         tc.position = glm::vec3(0.0f, 2.0f, 6.0f);
         tc.rotation = glm::vec3(-10.0f, 0.0f, 0.0f);
@@ -221,6 +225,7 @@ void Application::setup_scene_entities() {
     // Ground Plane
     if (m_plane_handle.is_valid()) {
         auto plane = m_scene->create_entity();
+        m_scene->registry().emplace<hz::TagComponent>(plane, "Ground Plane");
         auto& tc = m_scene->registry().emplace<hz::TransformComponent>(plane);
         tc.position = glm::vec3(0.0f, -1.0f, 0.0f);
         tc.scale = glm::vec3(1.0f);
@@ -243,6 +248,7 @@ void Application::setup_scene_entities() {
     // Test Cube
     if (m_cube_handle.is_valid()) {
         auto cube = m_scene->create_entity();
+        m_scene->registry().emplace<hz::TagComponent>(cube, "Test Cube");
         auto& tc = m_scene->registry().emplace<hz::TransformComponent>(cube);
         tc.position = glm::vec3(-2.0f, 10.0f, 0.0f); // Higher up to fall
 
@@ -265,6 +271,7 @@ void Application::setup_scene_entities() {
     // Test Sphere
     if (m_sphere_handle.is_valid()) {
         auto sphere = m_scene->create_entity();
+        m_scene->registry().emplace<hz::TagComponent>(sphere, "Test Sphere");
         auto& tc = m_scene->registry().emplace<hz::TransformComponent>(sphere);
         tc.position = glm::vec3(2.0f, 10.0f, 0.0f); // Higher up
 
@@ -287,6 +294,7 @@ void Application::setup_scene_entities() {
     // Point Light
     auto light = m_scene->create_entity();
     {
+        m_scene->registry().emplace<hz::TagComponent>(light, "Point Light");
         auto& tc = m_scene->registry().emplace<hz::TransformComponent>(light);
         tc.position = glm::vec3(0.0f, 3.0f, 2.0f);
 
@@ -327,6 +335,76 @@ void Application::on_update(float dt) {
 
     m_player_system.update(*m_scene, *m_input, *m_window, dt);
     m_animation_system.update(*m_scene, dt);
+
+    // F1 toggle for editor
+    bool f1_now = glfwGetKey(m_window->native_handle(), GLFW_KEY_F1) == GLFW_PRESS;
+    if (f1_now && !m_f1_held) {
+        m_show_editor = !m_show_editor;
+    }
+    m_f1_held = f1_now;
+
+    // Handle entity preset requests from editor
+    if (m_editor.should_add_cube() && m_cube_handle.is_valid()) {
+        auto e = m_scene->create_entity();
+        m_scene->registry().emplace<hz::TagComponent>(e, "New Cube");
+        auto& tc = m_scene->registry().emplace<hz::TransformComponent>(e);
+        tc.position = glm::vec3(0.0f, 5.0f, 0.0f);
+        auto& mc = m_scene->registry().emplace<hz::MeshComponent>(e);
+        mc.mesh_type = hz::MeshComponent::MeshType::Model;
+        mc.model = m_cube_handle;
+        mc.primitive_name = "cube";
+        auto& rb = m_scene->registry().emplace<hz::RigidBodyComponent>(e);
+        rb.type = hz::RigidBodyComponent::BodyType::Dynamic;
+        rb.mass = 5.0f;
+        auto& bc = m_scene->registry().emplace<hz::BoxColliderComponent>(e);
+        bc.half_extents = glm::vec3(0.5f);
+    }
+    if (m_editor.should_add_sphere() && m_sphere_handle.is_valid()) {
+        auto e = m_scene->create_entity();
+        m_scene->registry().emplace<hz::TagComponent>(e, "New Sphere");
+        auto& tc = m_scene->registry().emplace<hz::TransformComponent>(e);
+        tc.position = glm::vec3(0.0f, 5.0f, 0.0f);
+        auto& mc = m_scene->registry().emplace<hz::MeshComponent>(e);
+        mc.mesh_type = hz::MeshComponent::MeshType::Model;
+        mc.model = m_sphere_handle;
+        mc.primitive_name = "sphere";
+        auto& rb = m_scene->registry().emplace<hz::RigidBodyComponent>(e);
+        rb.type = hz::RigidBodyComponent::BodyType::Dynamic;
+        rb.mass = 5.0f;
+        auto& sc = m_scene->registry().emplace<hz::SphereColliderComponent>(e);
+        sc.radius = 1.0f;
+    }
+    if (m_editor.should_add_light()) {
+        auto e = m_scene->create_entity();
+        m_scene->registry().emplace<hz::TagComponent>(e, "New Light");
+        auto& tc = m_scene->registry().emplace<hz::TransformComponent>(e);
+        tc.position = glm::vec3(0.0f, 3.0f, 0.0f);
+        auto& lc = m_scene->registry().emplace<hz::LightComponent>(e);
+        lc.type = hz::LightType::Point;
+        lc.intensity = 10.0f;
+        lc.range = 20.0f;
+    }
+    if (m_editor.should_add_camera()) {
+        auto e = m_scene->create_entity();
+        m_scene->registry().emplace<hz::TagComponent>(e, "New Camera");
+        auto& tc = m_scene->registry().emplace<hz::TransformComponent>(e);
+        tc.position = glm::vec3(0.0f, 2.0f, 5.0f);
+        auto& cc = m_scene->registry().emplace<hz::CameraComponent>(e);
+        cc.primary = false;
+    }
+    if (m_editor.should_add_empty()) {
+        auto e = m_scene->create_entity();
+        m_scene->registry().emplace<hz::TagComponent>(e, "New Entity");
+        m_scene->registry().emplace<hz::TransformComponent>(e);
+    }
+    {
+        hz::Entity del_entity;
+        if (m_editor.should_delete_entity(del_entity)) {
+            if (m_scene->is_valid(del_entity)) {
+                m_scene->destroy_entity(del_entity);
+            }
+        }
+    }
 
     if (m_input->is_action_just_pressed(hz::InputManager::ACTION_MENU)) {
         m_window->close();
@@ -482,9 +560,10 @@ void Application::on_render([[maybe_unused]] float alpha) {
 
     // === UI ===
     m_imgui->begin_frame();
-    ImGui::Begin("PBR Test (Vulkan)");
-    ImGui::Text("Profiling: %.2f ms", 1000.0f / ImGui::GetIO().Framerate);
-    ImGui::End();
+    if (m_show_editor) {
+        m_editor.draw(*m_scene, m_scene_settings, ImGui::GetIO().Framerate,
+                      m_scene->entity_count(), m_renderer->get_stats());
+    }
     m_imgui->end_frame();
 
     cmd->end();
