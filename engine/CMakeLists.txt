@@ -62,6 +62,7 @@ set(ENGINE_SOURCES
     renderer/debug_renderer.cpp
     renderer/cinematic_camera.cpp
     renderer/gpu_scene.cpp
+    renderer/gpu_cull_pass.cpp
 
     # Audio
     audio/audio_engine.cpp

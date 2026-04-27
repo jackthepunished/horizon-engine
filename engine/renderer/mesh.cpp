@@ -15,6 +15,27 @@ namespace hz {
 Mesh::Mesh(std::vector<Vertex> vertices, std::vector<u32> indices)
     : m_vertices(std::move(vertices)), m_indices(std::move(indices)) {}
 
+glm::vec4 Mesh::bounding_sphere() const {
+    if (m_bounds_cached) return m_bounding_sphere;
+    if (m_vertices.empty()) {
+        m_bounding_sphere = glm::vec4(0.0f);
+        m_bounds_cached = true;
+        return m_bounding_sphere;
+    }
+    // Centroid then max-distance radius. Cheap and good enough for frustum culling.
+    glm::vec3 center(0.0f);
+    for (const auto& v : m_vertices) center += v.position;
+    center /= static_cast<float>(m_vertices.size());
+    float r2 = 0.0f;
+    for (const auto& v : m_vertices) {
+        const glm::vec3 d = v.position - center;
+        r2 = std::max(r2, glm::dot(d, d));
+    }
+    m_bounding_sphere = glm::vec4(center, std::sqrt(r2));
+    m_bounds_cached = true;
+    return m_bounding_sphere;
+}
+
 // ============================================================================
 // GPU Resource Management
 // ============================================================================

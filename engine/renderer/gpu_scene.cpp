@@ -192,6 +192,20 @@ u32 GPUScene::add_object(const glm::mat4& transform, u32 mesh_index, u32 materia
     return object_index;
 }
 
+std::unique_ptr<rhi::DescriptorSet>
+GPUScene::create_object_descriptor_set(const rhi::DescriptorSetLayout& layout) {
+    if (!m_object_set_pool) {
+        rhi::DescriptorPoolDesc desc{};
+        desc.pool_sizes = {{rhi::DescriptorType::StorageBuffer, 4}};
+        desc.max_sets = 4;
+        desc.debug_name = "GPUScene_ObjectSetPool";
+        m_object_set_pool = m_device.create_descriptor_pool(desc);
+    }
+    auto set = m_object_set_pool->allocate(layout);
+    set->write_storage_buffer(0, *m_object_buffer);
+    return set;
+}
+
 void GPUScene::end_frame() {
     if (m_objects.empty()) {
         return;

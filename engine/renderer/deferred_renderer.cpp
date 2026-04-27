@@ -1303,6 +1303,51 @@ void DeferredRenderer::create_pipelines() {
     }
 
     // =========================================================================
+    // Geometry Pipeline (GPU-driven / indirect)
+    // =========================================================================
+    {
+        // Object SSBO descriptor set layout (set 2)
+        rhi::DescriptorSetLayoutDesc obj_layout_desc;
+        obj_layout_desc.bindings.push_back(
+            rhi::DescriptorBinding::storage_buffer(0, rhi::ShaderStage::Vertex));
+        obj_layout_desc.debug_name = "ObjectSSBOLayout";
+        m_object_set_layout = m_device.create_descriptor_set_layout(obj_layout_desc);
+
+        // Pipeline layout: set 0 (camera), set 1 (material), set 2 (object SSBO).
+        // No push constants — model matrix comes from the SSBO.
+        rhi::PipelineLayoutDesc pl_desc;
+        pl_desc.set_layouts.push_back(m_camera_layout.get());
+        pl_desc.set_layouts.push_back(m_material_layout.get());
+        pl_desc.set_layouts.push_back(m_object_set_layout.get());
+        m_geometry_layout_indirect = m_device.create_pipeline_layout(pl_desc);
+
+        auto vs = m_device.create_shader_from_file(
+            "assets/shaders/deferred/vk_geometry_indirect.vert", rhi::ShaderStage::Vertex,
+            "GeometryIndirectVert");
+        auto fs = m_device.create_shader_from_file(
+            "assets/shaders/deferred/vk_geometry_indirect.frag", rhi::ShaderStage::Fragment,
+            "GeometryIndirectFrag");
+
+        if (vs && fs) {
+            rhi::GraphicsPipelineDesc desc;
+            desc.vertex_shader = vs.get();
+            desc.fragment_shader = fs.get();
+            desc.vertex_layout = rhi::VertexInputLayout::standard_vertex();
+            desc.topology = rhi::PrimitiveTopology::TriangleList;
+            desc.rasterization = rhi::RasterizationState::default_state();
+            desc.depth_stencil = rhi::DepthStencilState::default_state();
+            desc.blend = rhi::BlendState::disabled(4);
+            desc.multisample = {};
+            desc.layout = m_geometry_layout_indirect.get();
+            desc.color_attachment_formats = {rhi::Format::RGBA16_FLOAT, rhi::Format::RGBA16_FLOAT,
+                                             rhi::Format::RGBA16_FLOAT, rhi::Format::RG16_FLOAT};
+            desc.depth_attachment_format = rhi::Format::D32_FLOAT;
+            desc.debug_name = "GeometryIndirectPipeline";
+            m_geometry_pipeline_indirect = m_device.create_graphics_pipeline(desc);
+        }
+    }
+
+    // =========================================================================
     // Lighting Pipeline
     // =========================================================================
     {

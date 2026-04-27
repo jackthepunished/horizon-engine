@@ -186,6 +186,13 @@ public:
     [[nodiscard]] u32 object_count() const { return static_cast<u32>(m_objects.size()); }
     [[nodiscard]] u32 mesh_count() const { return static_cast<u32>(m_mesh_infos.size()); }
 
+    /**
+     * @brief Allocate a single-binding descriptor set holding the object SSBO at binding 0.
+     * Caller owns the resulting set. Layout must contain one storage_buffer binding at 0.
+     */
+    [[nodiscard]] std::unique_ptr<rhi::DescriptorSet>
+    create_object_descriptor_set(const rhi::DescriptorSetLayout& layout);
+
     [[nodiscard]] const GPUSceneConfig& config() const { return m_config; }
 
 private:
@@ -217,6 +224,9 @@ private:
 
     // Mesh pointer to index mapping (for deduplication)
     std::unordered_map<const Mesh*, u32> m_mesh_index_map;
+
+    // Pool for allocating object-SSBO descriptor sets.
+    std::unique_ptr<rhi::DescriptorPool> m_object_set_pool;
 };
 
 } // namespace hz

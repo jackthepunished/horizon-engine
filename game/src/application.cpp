@@ -66,6 +66,9 @@ bool Application::init_window() {
     m_imgui = std::make_unique<hz::ImGuiLayer>();
     m_imgui->init(*m_window);
 
+    // Apply professional dark editor theme
+    EditorUI::apply_dark_theme();
+
     return true;
 }
 
@@ -93,6 +96,10 @@ bool Application::init_renderer() {
     }
 
     m_debug_renderer = std::make_unique<hz::DebugRenderer>();
+
+    // GPU-driven rendering: scene buffers + culling pass
+    m_gpu_scene = std::make_unique<hz::GPUScene>(*m_device);
+    m_cull_pass = std::make_unique<hz::GpuCullPass>(*m_device, *m_gpu_scene);
 
     // 4. Initialize Synchronization primitives
     for (unsigned int i = 0; i < APP_MAX_FRAMES_IN_FLIGHT; ++i) {
@@ -211,6 +218,7 @@ void Application::setup_scene_entities() {
     // Player
     auto player_entity = m_scene->create_entity();
     {
+        m_scene->registry().emplace<hz::TagComponent>(player_entity, "Player Camera");
         auto& tc = m_scene->registry().emplace<hz::TransformComponent>(player_entity);
         tc.position = glm::vec3(0.0f, 2.0f, 6.0f);
         tc.rotation = glm::vec3(-10.0f, 0.0f, 0.0f);
@@ -221,6 +229,7 @@ void Application::setup_scene_entities() {
     // Ground Plane
     if (m_plane_handle.is_valid()) {
         auto plane = m_scene->create_entity();
+        m_scene->registry().emplace<hz::TagComponent>(plane, "Ground Plane");
         auto& tc = m_scene->registry().emplace<hz::TransformComponent>(plane);
         tc.position = glm::vec3(0.0f, -1.0f, 0.0f);
         tc.scale = glm::vec3(1.0f);
@@ -243,6 +252,7 @@ void Application::setup_scene_entities() {
     // Test Cube
     if (m_cube_handle.is_valid()) {
         auto cube = m_scene->create_entity();
+        m_scene->registry().emplace<hz::TagComponent>(cube, "Test Cube");
         auto& tc = m_scene->registry().emplace<hz::TransformComponent>(cube);
         tc.position = glm::vec3(-2.0f, 10.0f, 0.0f); // Higher up to fall
 
@@ -265,6 +275,7 @@ void Application::setup_scene_entities() {
     // Test Sphere
     if (m_sphere_handle.is_valid()) {
         auto sphere = m_scene->create_entity();
+        m_scene->registry().emplace<hz::TagComponent>(sphere, "Test Sphere");
         auto& tc = m_scene->registry().emplace<hz::TransformComponent>(sphere);
         tc.position = glm::vec3(2.0f, 10.0f, 0.0f); // Higher up
 
@@ -287,6 +298,7 @@ void Application::setup_scene_entities() {
     // Point Light
     auto light = m_scene->create_entity();
     {
+        m_scene->registry().emplace<hz::TagComponent>(light, "Point Light");
         auto& tc = m_scene->registry().emplace<hz::TransformComponent>(light);
         tc.position = glm::vec3(0.0f, 3.0f, 2.0f);
 
@@ -327,6 +339,84 @@ void Application::on_update(float dt) {
 
     m_player_system.update(*m_scene, *m_input, *m_window, dt);
     m_animation_system.update(*m_scene, dt);
+
+    // F1 toggle for editor
+    bool f1_now = glfwGetKey(m_window->native_handle(), GLFW_KEY_F1) == GLFW_PRESS;
+    if (f1_now && !m_f1_held) {
+        m_show_editor = !m_show_editor;
+    }
+    m_f1_held = f1_now;
+
+    // F2 toggle for GPU-driven culling (A/B against legacy CPU draw loop)
+    bool f2_now = glfwGetKey(m_window->native_handle(), GLFW_KEY_F2) == GLFW_PRESS;
+    if (f2_now && !m_f2_held) {
+        m_use_gpu_culling = !m_use_gpu_culling;
+        HZ_LOG_INFO("GPU culling: {}", m_use_gpu_culling ? "ON" : "OFF");
+    }
+    m_f2_held = f2_now;
+
+    // Handle entity preset requests from editor
+    if (m_editor.should_add_cube() && m_cube_handle.is_valid()) {
+        auto e = m_scene->create_entity();
+        m_scene->registry().emplace<hz::TagComponent>(e, "New Cube");
+        auto& tc = m_scene->registry().emplace<hz::TransformComponent>(e);
+        tc.position = glm::vec3(0.0f, 5.0f, 0.0f);
+        auto& mc = m_scene->registry().emplace<hz::MeshComponent>(e);
+        mc.mesh_type = hz::MeshComponent::MeshType::Model;
+        mc.model = m_cube_handle;
+        mc.primitive_name = "cube";
+        auto& rb = m_scene->registry().emplace<hz::RigidBodyComponent>(e);
+        rb.type = hz::RigidBodyComponent::BodyType::Dynamic;
+        rb.mass = 5.0f;
+        auto& bc = m_scene->registry().emplace<hz::BoxColliderComponent>(e);
+        bc.half_extents = glm::vec3(0.5f);
+    }
+    if (m_editor.should_add_sphere() && m_sphere_handle.is_valid()) {
+        auto e = m_scene->create_entity();
+        m_scene->registry().emplace<hz::TagComponent>(e, "New Sphere");
+        auto& tc = m_scene->registry().emplace<hz::TransformComponent>(e);
+        tc.position = glm::vec3(0.0f, 5.0f, 0.0f);
+        auto& mc = m_scene->registry().emplace<hz::MeshComponent>(e);
+        mc.mesh_type = hz::MeshComponent::MeshType::Model;
+        mc.model = m_sphere_handle;
+        mc.primitive_name = "sphere";
+        auto& rb = m_scene->registry().emplace<hz::RigidBodyComponent>(e);
+        rb.type = hz::RigidBodyComponent::BodyType::Dynamic;
+        rb.mass = 5.0f;
+        auto& sc = m_scene->registry().emplace<hz::SphereColliderComponent>(e);
+        sc.radius = 1.0f;
+    }
+    if (m_editor.should_add_light()) {
+        auto e = m_scene->create_entity();
+        m_scene->registry().emplace<hz::TagComponent>(e, "New Light");
+        auto& tc = m_scene->registry().emplace<hz::TransformComponent>(e);
+        tc.position = glm::vec3(0.0f, 3.0f, 0.0f);
+        auto& lc = m_scene->registry().emplace<hz::LightComponent>(e);
+        lc.type = hz::LightType::Point;
+        lc.intensity = 10.0f;
+        lc.range = 20.0f;
+    }
+    if (m_editor.should_add_camera()) {
+        auto e = m_scene->create_entity();
+        m_scene->registry().emplace<hz::TagComponent>(e, "New Camera");
+        auto& tc = m_scene->registry().emplace<hz::TransformComponent>(e);
+        tc.position = glm::vec3(0.0f, 2.0f, 5.0f);
+        auto& cc = m_scene->registry().emplace<hz::CameraComponent>(e);
+        cc.primary = false;
+    }
+    if (m_editor.should_add_empty()) {
+        auto e = m_scene->create_entity();
+        m_scene->registry().emplace<hz::TagComponent>(e, "New Entity");
+        m_scene->registry().emplace<hz::TransformComponent>(e);
+    }
+    {
+        hz::Entity del_entity;
+        if (m_editor.should_delete_entity(del_entity)) {
+            if (m_scene->is_valid(del_entity)) {
+                m_scene->destroy_entity(del_entity);
+            }
+        }
+    }
 
     if (m_input->is_action_just_pressed(hz::InputManager::ACTION_MENU)) {
         m_window->close();
@@ -424,29 +514,79 @@ void Application::on_render([[maybe_unused]] float alpha) {
         m_renderer->end_shadow_pass(*cmd);
     }
 
-    // === Geometry Pass ===
-    m_renderer->begin_geometry_pass(*cmd, camera);
-
-    // Bind default material set (Set 1)
-    if (m_default_material_set) {
-        cmd->bind_descriptor_set(*m_renderer->get_geometry_layout(), 1, *m_default_material_set);
-    }
-
-    // Render entities
-    {
+    // === GPU Scene submission + Cull ===
+    if (m_use_gpu_culling && m_gpu_scene && m_cull_pass) {
+        m_gpu_scene->begin_frame();
         auto group =
             m_scene->registry().group<hz::TransformComponent>(entt::get<hz::MeshComponent>);
         for (auto entity : group) {
             auto [tc, mc] = group.get<hz::TransformComponent, hz::MeshComponent>(entity);
+            const hz::Mesh* mesh = resolve_mesh(mc);
+            if (!mesh || !mesh->is_uploaded()) continue;
+            // Lazy-register: every Mesh enters the GPUScene mega-buffer once.
+            if (mesh->gpu_mesh_index() == UINT32_MAX) {
+                const hz::u32 idx = m_gpu_scene->register_mesh(*mesh);
+                mesh->set_gpu_mesh_index(idx);
+            }
+            if (mesh->gpu_mesh_index() == UINT32_MAX) continue; // capacity exceeded
+            const hz::u32 flags =
+                static_cast<hz::u32>(hz::GPUObjectFlags::Visible) |
+                (mc.cast_shadows ? static_cast<hz::u32>(hz::GPUObjectFlags::CastShadow) : 0u);
+            m_gpu_scene->add_object(tc.get_transform(), mesh->gpu_mesh_index(), 0u,
+                                    mesh->bounding_sphere(),
+                                    static_cast<hz::GPUObjectFlags>(flags));
+        }
+        m_gpu_scene->end_frame();
 
+        const glm::mat4 view = camera.view_matrix();
+        const hz::u32 fb_w = m_swapchain->width();
+        const hz::u32 fb_h = m_swapchain->height();
+        const float aspect = (fb_h > 0) ? static_cast<float>(fb_w) / static_cast<float>(fb_h) : 1.0f;
+        const glm::mat4 proj = camera.projection_matrix(aspect);
+        m_cull_pass->execute(*cmd, view, proj, *m_gpu_scene);
+    }
+
+    // === Geometry Pass ===
+    m_renderer->begin_geometry_pass(*cmd, camera);
+
+    if (m_use_gpu_culling && m_gpu_scene && m_renderer->get_geometry_pipeline_indirect()) {
+        // GPU-driven path: single indirect draw using cull-shader output.
+        if (!m_object_set && m_renderer->get_object_set_layout()) {
+            m_object_set =
+                m_gpu_scene->create_object_descriptor_set(*m_renderer->get_object_set_layout());
+        }
+        const auto* layout = m_renderer->get_geometry_layout_indirect();
+        cmd->bind_pipeline(*m_renderer->get_geometry_pipeline_indirect());
+        if (auto* cam = m_renderer->get_camera_set()) {
+            cmd->bind_descriptor_set(*layout, 0, *cam);
+        }
+        if (m_default_material_set) {
+            cmd->bind_descriptor_set(*layout, 1, *m_default_material_set);
+        }
+        if (m_object_set) {
+            cmd->bind_descriptor_set(*layout, 2, *m_object_set);
+        }
+        cmd->bind_vertex_buffer(0, *m_gpu_scene->vertex_buffer());
+        cmd->bind_index_buffer(*m_gpu_scene->index_buffer(), 0, hz::rhi::IndexType::Uint32);
+        cmd->draw_indexed_indirect_count(*m_gpu_scene->draw_command_buffer(), 0,
+                                         *m_gpu_scene->draw_count_buffer(), 0,
+                                         m_gpu_scene->object_count(),
+                                         sizeof(hz::GPUDrawCommand));
+    } else {
+        // Legacy CPU-driven path
+        if (m_default_material_set) {
+            cmd->bind_descriptor_set(*m_renderer->get_geometry_layout(), 1,
+                                     *m_default_material_set);
+        }
+        auto group =
+            m_scene->registry().group<hz::TransformComponent>(entt::get<hz::MeshComponent>);
+        for (auto entity : group) {
+            auto [tc, mc] = group.get<hz::TransformComponent, hz::MeshComponent>(entity);
             const hz::Mesh* mesh = resolve_mesh(mc);
             if (mesh) {
-                // Push Model Matrix (Vertex Stage, Offset 0)
                 glm::mat4 model = tc.get_transform();
                 cmd->push_constants(*m_renderer->get_geometry_layout(),
                                     hz::rhi::ShaderStage::Vertex, model, 0);
-
-                // Push Material Params (Fragment Stage, Offset 64)
                 struct MatParams {
                     glm::vec4 albedo;
                     float roughness;
@@ -455,11 +595,8 @@ void Application::on_render([[maybe_unused]] float alpha) {
                 mat_params.albedo = glm::vec4(mc.albedo_color, 1.0f);
                 mat_params.roughness = mc.roughness;
                 mat_params.metallic = mc.metallic;
-
                 cmd->push_constants(*m_renderer->get_geometry_layout(),
                                     hz::rhi::ShaderStage::Fragment, mat_params, 64);
-
-                // Draw
                 mesh->draw(*cmd);
             }
         }
@@ -482,9 +619,10 @@ void Application::on_render([[maybe_unused]] float alpha) {
 
     // === UI ===
     m_imgui->begin_frame();
-    ImGui::Begin("PBR Test (Vulkan)");
-    ImGui::Text("Profiling: %.2f ms", 1000.0f / ImGui::GetIO().Framerate);
-    ImGui::End();
+    if (m_show_editor) {
+        m_editor.draw(*m_scene, m_scene_settings, ImGui::GetIO().Framerate,
+                      m_scene->entity_count(), m_renderer->get_stats());
+    }
     m_imgui->end_frame();
 
     cmd->end();
