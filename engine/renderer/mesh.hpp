@@ -131,6 +131,17 @@ public:
     [[nodiscard]] rhi::Buffer* vertex_buffer() const { return m_vertex_buffer.get(); }
     [[nodiscard]] rhi::Buffer* index_buffer() const { return m_index_buffer.get(); }
 
+    // =========================================================================
+    // GPU-Driven Rendering
+    // =========================================================================
+
+    /// Local-space bounding sphere (xyz=center, w=radius). Computed once on first access.
+    [[nodiscard]] glm::vec4 bounding_sphere() const;
+
+    /// Index assigned by GPUScene::register_mesh; UINT32_MAX if unregistered.
+    [[nodiscard]] u32 gpu_mesh_index() const { return m_gpu_mesh_index; }
+    void set_gpu_mesh_index(u32 idx) const { m_gpu_mesh_index = idx; }
+
 private:
     std::vector<Vertex> m_vertices;
     std::vector<u32> m_indices;
@@ -138,6 +149,11 @@ private:
     // GPU buffers (created by upload_to_gpu)
     std::unique_ptr<rhi::Buffer> m_vertex_buffer;
     std::unique_ptr<rhi::Buffer> m_index_buffer;
+
+    // GPU-driven rendering: lazy-cached bounds and registry index.
+    mutable glm::vec4 m_bounding_sphere{0.0f};
+    mutable bool m_bounds_cached{false};
+    mutable u32 m_gpu_mesh_index{UINT32_MAX};
 };
 
 } // namespace hz
