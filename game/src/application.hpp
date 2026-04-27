@@ -29,6 +29,8 @@
 #include <engine/platform/window.hpp>
 #include <engine/renderer/debug_renderer.hpp>
 #include <engine/renderer/deferred_renderer.hpp>
+#include <engine/renderer/gpu_cull_pass.hpp>
+#include <engine/renderer/gpu_scene.hpp>
 #include <engine/renderer/ibl.hpp>
 #include <engine/renderer/mesh.hpp>
 #include <engine/rhi/rhi_command_list.hpp>
@@ -87,6 +89,12 @@ private:
     std::unique_ptr<hz::AssetRegistry> m_assets;
     std::unique_ptr<hz::IBL> m_ibl;
 
+    // GPU-driven rendering
+    std::unique_ptr<hz::GPUScene> m_gpu_scene;
+    std::unique_ptr<hz::GpuCullPass> m_cull_pass;
+    std::unique_ptr<hz::rhi::DescriptorSet> m_object_set;
+    bool m_use_gpu_culling{true};
+
     // Game systems
     PlayerSystem m_player_system;
     PhysicsSystem m_physics_system;
@@ -117,6 +125,7 @@ private:
     SceneSettings m_scene_settings;
     bool m_show_editor{true};
     bool m_f1_held{false};
+    bool m_f2_held{false};
 
     // UI state
     bool m_show_grid{false};
