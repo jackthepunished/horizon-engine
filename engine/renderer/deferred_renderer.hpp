@@ -404,6 +404,18 @@ public:
         return m_geometry_layout.get();
     }
 
+    // GPU-driven indirect rendering accessors.
+    [[nodiscard]] const rhi::PipelineLayout* get_geometry_layout_indirect() const {
+        return m_geometry_layout_indirect.get();
+    }
+    [[nodiscard]] const rhi::Pipeline* get_geometry_pipeline_indirect() const {
+        return m_geometry_pipeline_indirect.get();
+    }
+    [[nodiscard]] const rhi::DescriptorSetLayout* get_object_set_layout() const {
+        return m_object_set_layout.get();
+    }
+    [[nodiscard]] const rhi::DescriptorSet* get_camera_set() const { return m_camera_set.get(); }
+
 private:
     // Debug accessors (returning Views)
     [[nodiscard]] rhi::TextureView* get_gbuffer_albedo() const {
@@ -473,6 +485,10 @@ private:
     // Pipelines
     std::unique_ptr<rhi::Pipeline> m_geometry_pipeline;
     std::unique_ptr<rhi::PipelineLayout> m_geometry_layout;
+    // GPU-driven variant: reads model matrix from object SSBO via gl_BaseInstance.
+    std::unique_ptr<rhi::Pipeline> m_geometry_pipeline_indirect;
+    std::unique_ptr<rhi::PipelineLayout> m_geometry_layout_indirect;
+    std::unique_ptr<rhi::DescriptorSetLayout> m_object_set_layout;
     std::unique_ptr<rhi::Pipeline> m_lighting_pipeline;
     std::unique_ptr<rhi::PipelineLayout> m_lighting_layout;
     std::unique_ptr<rhi::Pipeline> m_composite_pipeline;
