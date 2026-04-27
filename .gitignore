@@ -35,4 +35,16 @@ Thumbs.db
 # Vulkan compiled shaders
 *.spv
 imgui.ini
-build_log.txt
+
+# Stray local debug dumps from build/run iteration
+build_log*.txt
+build_out*.txt
+build_output*.txt
+build_errors*.txt
+build_editor*.txt
+cmake_config_out*.txt
+game_log*.txt
+game_output*.txt
+game_stderr*.txt
+game_stdout*.txt
+*_tmp.txt
